@@ -1010,3 +1010,20 @@ textarea,
     background: CanvasText;
   }
 }
+
+.profile-editor h3, #imageAllowlistManager h3 { margin: 0 0 8px; font-size: 13px; }
+.profile-editor > select, .profile-editor details input, .profile-editor textarea { width: 100%; }
+.profile-editor details { margin: 10px 0; }
+.profile-editor details label { display: block; margin-top: 8px; }
+.profile-editor summary { cursor: pointer; color: var(--accent-ink); }
+#profileFields { display: grid; gap: 10px; margin: 14px 0; }
+#profileFields label { display: grid; grid-template-columns: 1fr 156px; align-items: center; gap: 8px; }
+#profileFields select { min-width: 0; width: 100%; }
+.profile-keywords { display: flex; align-items: center; gap: 6px; margin: 8px 0; }
+.profile-keywords input { width: auto; }
+.profile-editor textarea { resize: vertical; min-height: 68px; }
+.update-row { align-items: flex-start; gap: 10px; }
+.update-row .setting-copy { min-width: 0; }
+.update-row button { flex-shrink: 0; }
+#updateReleaseLink { display: inline-block; margin-top: 6px; color: var(--accent-ink); }
+#profileStatus { min-height: 18px; }

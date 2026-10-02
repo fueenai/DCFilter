@@ -122,3 +122,34 @@ test('normalization safely handles Unicode, zero width, whitespace, length and i
   assert.equal(clipped.endsWith('\uD83D'), false);
   assert.equal(policy.analyze(templates[1].replace('정교', '정\u200B교'), { templates }).hide, true);
 });
+
+test('explicit sentence allowlist wins over examples and heuristic blocking', () => {
+  assert.equal(policy.analyze(obvious, { allowlist: [obvious] }).hide, false);
+  const rows = [{ id: 'c1', text: templates[1], fullText: templates[1], authorKey: 'a' }];
+  const [result] = policy.analyzeComments(rows, { templates, allowlist: [templates[1]] });
+  assert.equal(result.blocked, false);
+  assert.equal(result.allowed, true);
+  assert.equal(policy.analyze(templates[1], { templates, allowlist: [] }).hide, true);
+});
+
+test('allowlist compares the complete normalized sentence without fuzzy exemptions', () => {
+  const text = '  ＡＩ 시대\n댓글입니다!  ';
+  assert.equal(policy.matchesExact(text, ['ai 시대 댓글입니다!']), true);
+  for (const changed of [templates[1] + '!', templates[1] + '요', templates[1] + ' 근데 반대한다.', '“' + templates[1] + '”']) {
+    assert.equal(policy.matchesExact(changed, [templates[1]]), false, changed);
+  }
+  const result = policy.analyze(templates[1], { templates, allowlist: [templates[1]], fullText: `인용 ${templates[1]}` });
+  assert.equal(result.allowed, undefined, 'a quoted body cannot inherit an exception for its partial text');
+  assert.equal(policy.matchesExact('x'.repeat(601), ['x'.repeat(600)]), false);
+  assert.equal(policy.matchesExact('x'.repeat(601), ['x'.repeat(601)]), false);
+  assert.equal(policy.matchesExact('a', [null, 42, {}]), false);
+});
+
+test('a deliberately saved complete discussion or quote is a blocking example', () => {
+  for (const text of [`예시: ${templates[1]}`, `“${templates[1]}”`]) {
+    assert.equal(policy.analyze(text, { templates: [text] }).hide, true);
+    assert.equal(policy.analyze(text, { templates: [text], allowlist: [text] }).hide, false);
+  }
+  assert.equal(policy.analyze(`“${templates[1]}”`, { templates }).hide, false);
+  assert.equal(policy.analyze('짧은 문장', { templates: ['짧은 문장'] }).hide, false);
+});

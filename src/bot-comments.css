@@ -47,6 +47,92 @@
   outline-offset: 2px;
 }
 
+.comment_wrap .dcf-bot-control [hidden] { display: none !important; }
+
+.comment_wrap .dcf-bot-plain {
+  float: right;
+  margin: 0 0 0 6px;
+  padding: 0;
+}
+
+.comment_wrap .dcf-bot-menu-toggle,
+.comment_wrap .dcf-bot-menu button {
+  min-height: 28px;
+  margin: 0;
+  padding: 3px 8px;
+  border: 1px solid var(--dcf-border-strong, #cccfd7);
+  border-radius: 4px;
+  background: var(--dcf-surface, #fff);
+  color: var(--dcf-text, #1c1f28);
+  font: inherit;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.comment_wrap .dcf-bot-menu-toggle {
+  color: var(--dcf-muted, #5f636f);
+  background: transparent;
+  border-color: transparent;
+}
+
+.comment_wrap .dcf-bot-menu-toggle:hover,
+.comment_wrap .dcf-bot-menu button:hover {
+  background: var(--dcf-surface-2, #f2f4f7);
+}
+
+.comment_wrap .dcf-bot-control button:focus-visible {
+  outline: 2px solid var(--dcf-link, #3b4890);
+  outline-offset: 2px;
+}
+
+.comment_wrap .dcf-bot-control button:disabled { cursor: wait; opacity: .6; }
+
+.comment_wrap .dcf-bot-menu-open {
+  float: none;
+  width: 100%;
+  margin: 3px 0;
+}
+
+/* The expanded controls stay in normal flow so DC's overflow-clipped comment
+   containers and narrow reply columns cannot cut off menu items. */
+.comment_wrap .dcf-bot-menu {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.comment_wrap .dcf-bot-status {
+  flex: 1 0 100%;
+  overflow-wrap: anywhere;
+}
+
+.dcf-bot-toast {
+  position: fixed;
+  z-index: 2147483647;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px;
+  border: 1px solid var(--dcf-border-strong, #cccfd7);
+  border-radius: 6px;
+  background: var(--dcf-surface, #fff);
+  color: var(--dcf-text, #1c1f28);
+  font: 13px/1.5 sans-serif;
+  overflow-wrap: anywhere;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .comment_wrap .dcf-bot-plain:not(.dcf-bot-menu-open) .dcf-bot-menu-toggle { opacity: .15; }
+  .comment_wrap :is(.cmt_txtbox, .comment_txt, .cmt_info, .reply_info):hover .dcf-bot-menu-toggle,
+  .comment_wrap .dcf-bot-control:focus-within .dcf-bot-menu-toggle { opacity: 1; }
+}
+
 .comment_wrap .dcf-bot-revealed {
   margin-bottom: 3px;
 }
@@ -55,4 +141,7 @@
   .comment_wrap .dcf-bot-control { color: CanvasText; }
   .comment_wrap .dcf-bot-toggle { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
   .comment_wrap .dcf-bot-toggle:focus-visible { outline-color: Highlight; }
+  .comment_wrap .dcf-bot-control button { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
+  .comment_wrap .dcf-bot-control button:focus-visible { outline-color: Highlight; }
+  .comment_wrap .dcf-bot-plain .dcf-bot-menu-toggle { opacity: 1 !important; }
 }

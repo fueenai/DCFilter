@@ -10,39 +10,38 @@
   const IGNORE_TEXT_SELECTOR = 'script, style, noscript, button, input, textarea, select, iframe, object, embed, [data-dcf-owned], [contenteditable]:not([contenteditable="false"])';
   const QUOTE_SELECTOR = "blockquote, q, pre, code";
   const DELETED_SELECTOR = '.cmt_del_txt, .del_comment, .deleted_comment, [data-deleted="true"]';
-  const SETTING_KEYS = ["enabled", "botCommentFilter", "botCommentSensitivity", "botCommentExamples"];
+  const SETTING_KEYS = ["enabled", "botCommentFilter", "botCommentSensitivity", "botCommentExamples", "botCommentAllowlist"];
   const records = new Map();
-  const initialChanges = {};
   let settings = storage.DEFAULTS;
   let ready = false;
   let active = false;
   let timer = 0;
   let serial = 0;
   let settingsSignature = "";
+  let settingsRead = 0;
 
   const observer = new MutationObserver((changes) => {
     if (changes.some(isCommentMutation)) scheduleScan();
   });
 
-  // Register before the initial read so a slow storage response cannot undo a
-  // newer setting change (including deletion of a stored preference).
+  // Resolve the current gallery again after changes. Sequence reads so an old
+  // async response cannot overwrite a newer profile or rule update.
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "sync") return;
-    const patch = {};
-    for (const key of SETTING_KEYS) {
-      if (Object.hasOwn(changes, key)) patch[key] = changes[key].newValue;
-    }
-    if (!Object.keys(patch).length) return;
-    if (!ready) {
-      Object.assign(initialChanges, patch);
-      return;
-    }
-    configure(storage.normalizeSettings({ ...settings, ...patch }));
+    if (typeof storage.isSettingsChange === "function" ? !storage.isSettingsChange(changes) : !SETTING_KEYS.some(key => Object.hasOwn(changes, key))) return;
+    refreshSettings();
   });
-  storage.loadSettings().then(
-    (initial) => configure(storage.normalizeSettings({ ...initial, ...initialChanges })),
-    () => configure(storage.normalizeSettings({ ...storage.DEFAULTS, ...initialChanges }))
-  );
+  refreshSettings();
+
+  async function refreshSettings() {
+    const read = ++settingsRead;
+    try {
+      const next = await storage.loadSettings();
+      if (read === settingsRead) configure(next);
+    } catch (_) {
+      if (read === settingsRead && !ready) configure(storage.DEFAULTS);
+    }
+  }
 
   function observe() {
     if (!active || !document.documentElement) return;
@@ -122,8 +121,9 @@
     // leaf body may be collapsed; never its author, controls, or child replies.
     if (element.querySelector(".usertxt, .comment_txt, .cmt_info, .reply_info, .gall_writer")) return null;
     const text = bodyText(element);
-    if (!text || /^(?:삭제된\s*댓글(?:입니다)?|작성자(?:에\s*의해|가)\s*삭제한\s*댓글(?:입니다)?|관리자(?:에\s*의해|가)\s*삭제한\s*댓글(?:입니다)?)[.!\s]*$/.test(text)) return null;
-    return { text, fingerprint: bodyText(element, false) };
+    const fingerprint = bodyText(element, false);
+    if (!fingerprint || /^(?:삭제된\s*댓글(?:입니다)?|작성자(?:에\s*의해|가)\s*삭제한\s*댓글(?:입니다)?|관리자(?:에\s*의해|가)\s*삭제한\s*댓글(?:입니다)?)[.!\s]*$/.test(fingerprint)) return null;
+    return { text, fingerprint };
   }
 
   function authorKey(element) {
@@ -152,13 +152,15 @@
         current.add(element);
         let record = records.get(element);
         if (!record) {
-          record = { element, id: `dcf-bot-comment-${++serial}`, fingerprint: value.fingerprint, revealed: false, control: null, ownedId: null };
+          record = { element, id: `dcf-bot-comment-${++serial}`, fingerprint: value.fingerprint, revealed: false, control: null, ownedId: null, pending: false, menuOpen: false };
           records.set(element, record);
         } else if (record.fingerprint !== value.fingerprint) {
           record.fingerprint = value.fingerprint;
           record.revealed = false;
+          record.menuOpen = false;
+          if (record.status) record.status.textContent = "";
         }
-        comments.push({ id: record.id, text: value.text, authorKey: authorKey(element) });
+        comments.push({ id: record.id, text: value.text, fullText: value.fingerprint, authorKey: authorKey(element) });
       }
       for (const [element, record] of records) {
         if (current.has(element)) continue;
@@ -167,12 +169,12 @@
       }
       const results = new Map(policy.analyzeComments(comments, {
         sensitivity: settings.botCommentSensitivity,
-        templates: settings.botCommentExamples
+        templates: settings.botCommentExamples,
+        allowlist: settings.botCommentAllowlist
       }).map((result) => [result.id, result]));
       for (const record of records.values()) {
         const result = results.get(record.id);
-        if (result?.blocked) changed = collapse(record, result) || changed;
-        else changed = restore(record) || changed;
+        changed = render(record, result) || changed;
       }
     } catch (error) {
       // A classifier failure must not leave unreadable text behind.
@@ -194,7 +196,7 @@
     return record.element.id;
   }
 
-  function collapse(record, result) {
+  function render(record, result) {
     let changed = false;
     if (!record.control?.isConnected || record.control.parentElement !== record.element.parentElement) {
       record.control?.remove();
@@ -213,27 +215,133 @@
         updateVisibility(record);
         notifyLayout();
       });
+      const menuButton = document.createElement("button");
+      menuButton.type = "button";
+      menuButton.className = "dcf-bot-menu-toggle";
+      menuButton.textContent = "필터";
+      menuButton.setAttribute("aria-label", "이 댓글의 필터 설정");
+      const panel = document.createElement("span");
+      panel.className = "dcf-bot-menu";
+      panel.id = `${record.id}-menu`;
+      menuButton.setAttribute("aria-controls", panel.id);
+      menuButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        record.menuOpen = !record.menuOpen;
+        updateMenu(record);
+        notifyLayout();
+      });
+      const allowButton = document.createElement("button");
+      allowButton.type = "button";
+      allowButton.addEventListener("click", () => saveRule(record, record.allowed ? "removeAllow" : "allow"));
+      const blockButton = document.createElement("button");
+      blockButton.type = "button";
+      blockButton.addEventListener("click", () => saveRule(record, record.example ? "removeBlock" : "block"));
+      const status = document.createElement("span");
+      status.className = "dcf-bot-status";
+      status.setAttribute("role", "status");
+      status.setAttribute("aria-live", "polite");
+      panel.append(allowButton, blockButton, status);
       // The surrounding native comment body is also a reply click target.
       control.addEventListener("click", (event) => event.stopPropagation());
-      control.append(label, button);
+      control.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && record.menuOpen) {
+          event.preventDefault();
+          event.stopPropagation();
+          record.menuOpen = false;
+          updateMenu(record);
+          menuButton.focus();
+          notifyLayout();
+        }
+      });
+      control.append(label, button, menuButton, panel);
       record.element.insertAdjacentElement("beforebegin", control);
       record.control = control;
       record.label = label;
       record.button = button;
+      record.menuButton = menuButton;
+      record.panel = panel;
+      record.allowButton = allowButton;
+      record.blockButton = blockButton;
+      record.status = status;
       changed = true;
     }
+    record.blocked = Boolean(result?.blocked);
+    record.allowed = policy.matchesExact(record.fingerprint, settings.botCommentAllowlist);
+    record.example = policy.matchesExact(record.fingerprint, settings.botCommentExamples);
     record.button.setAttribute("aria-controls", ensureTextId(record));
-    const reason = Array.isArray(result.reasons) && typeof result.reasons[0] === "string" ? result.reasons[0] : "정형적인 답변 패턴";
+    const reason = Array.isArray(result?.reasons) && typeof result.reasons[0] === "string" ? result.reasons[0] : "정형적인 답변 패턴";
     const label = `봇 의심 댓글 · ${reason}`;
     if (record.label.textContent !== label) {
       record.label.textContent = label;
       changed = true;
     }
+    record.label.hidden = !record.blocked;
+    record.button.hidden = !record.blocked;
+    record.control.classList.toggle("dcf-bot-plain", !record.blocked);
+    updateMenu(record);
     return updateVisibility(record) || changed;
   }
 
+  function updateMenu(record) {
+    record.panel.hidden = !record.menuOpen;
+    record.menuButton.setAttribute("aria-expanded", String(record.menuOpen));
+    record.control.classList.toggle("dcf-bot-menu-open", record.menuOpen);
+    record.allowButton.textContent = record.allowed ? "항상 표시 취소" : "이 문장은 항상 표시";
+    record.blockButton.textContent = record.example ? "차단 예시에서 삭제" : "차단 예시로 추가";
+    record.allowButton.disabled = record.pending;
+    record.blockButton.disabled = record.pending;
+  }
+
+  function feedback(record, message) {
+    if (record.control?.isConnected && record.menuOpen) {
+      record.status.textContent = message;
+      return;
+    }
+    // The site may replace a comment page while an async save is pending.
+    const toast = document.createElement("div");
+    toast.className = "dcf-bot-toast";
+    toast.setAttribute("data-dcf-owned", "bot-comment");
+    toast.setAttribute("role", "status");
+    toast.textContent = message;
+    (document.body || document.documentElement).append(toast);
+    window.setTimeout(() => toast.remove(), 6000);
+  }
+
+  async function saveRule(record, action) {
+    if (record.pending) return;
+    const current = record.element.isConnected ? candidate(record.element) : null;
+    if (!current || current.fingerprint !== record.fingerprint) {
+      feedback(record, "댓글 내용이 바뀌었습니다. 다시 선택해 주세요.");
+      scheduleScan();
+      return;
+    }
+    const text = current.fingerprint;
+    if (text.length > policy.MAX_TEMPLATE_LENGTH) {
+      feedback(record, "600자 이하의 댓글만 문장 규칙으로 등록할 수 있습니다.");
+      return;
+    }
+    if (action === "block" && policy.compactText(text).length < 8) {
+      feedback(record, "너무 짧은 문장은 차단 예시로 등록할 수 없습니다. 문자·숫자 8자 이상이 필요합니다.");
+      return;
+    }
+    record.pending = true;
+    updateMenu(record);
+    feedback(record, "저장 중…");
+    try {
+      await storage.updateCommentRule(text, action);
+      await refreshSettings();
+      feedback(record, ({ allow: "이 문장을 항상 표시합니다.", block: "차단 예시에 추가했습니다.", removeAllow: "항상 표시를 취소했습니다.", removeBlock: "차단 예시에서 삭제했습니다." })[action]);
+      scheduleScan();
+    } catch (error) {
+      feedback(record, `저장하지 못했습니다. ${error?.message || "잠시 후 다시 시도해 주세요."}`);
+    } finally {
+      record.pending = false;
+      if (record.control?.isConnected) updateMenu(record);
+    }
+  }
+
   function updateVisibility(record) {
-    const collapsed = !record.revealed;
+    const collapsed = record.blocked && !record.revealed;
     const changed = record.element.classList.contains("dcf-bot-collapsed") !== collapsed;
     record.element.classList.toggle("dcf-bot-collapsed", collapsed);
     record.control.classList.toggle("dcf-bot-revealed", !collapsed);

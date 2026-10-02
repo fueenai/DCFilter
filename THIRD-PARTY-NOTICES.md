@@ -6,8 +6,9 @@ DCFilter includes the following assets for local inference. The model and runtim
 are bundled; inference does not require a model server or API key. Images selected
 for analysis are fetched from permitted DCInside image hosts, then processed in
 the extension. Neither image pixels nor analysis results are sent to a model/API
-provider. This describes the analysis path: feature settings, block lists and
-user-entered comment examples use the browser's sync storage and may be synced by
+provider. This describes the analysis path: common and gallery-specific settings,
+block lists, user-entered comment examples and allowed whole-comment sentences
+use the browser's sync storage and may be synced by
 the browser provider according to the user's account and sync settings.
 
 | Component | Pinned source | License |
@@ -36,6 +37,19 @@ an uncertain classification is not a safe-content verdict. The full image and ov
 square crops of long images are inspected, but small details may still be missed.
 CLIP uses 224px inputs; canvas resampling is used in the browser. This filter is a
 viewing aid, not a guarantee that displayed images are safe.
+
+Since 0.7.0, users can explicitly allow an individual supported still image. Only
+its SHA-256 digest and the time of that choice are stored locally, up to 500 entries;
+image bytes and URLs are not stored in that list or synced. Re-fetched bytes are
+validated before a matching digest skips inference. Users can revoke permission
+individually or clear the list. This is a user preference, not model training or a
+safe-content verdict, and does not bypass independent hide-all or signature-image
+filters. Temporary failures offer a retry; unsupported formats remain separate.
+
+The settings popup also requests public release metadata from the GitHub API,
+normally once per day while opened. This request attaches no image, comment,
+browsing history, credential or cookie data; GitHub receives ordinary connection
+metadata. Updates are downloaded and installed manually by the user.
 
 In an earlier browser smoke check, before the default display policy changed in
 0.6.2, a public car photo passed strict mode while a public photo of two sleeping

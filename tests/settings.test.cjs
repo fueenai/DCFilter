@@ -15,6 +15,13 @@ test('설정 저장은 다른 창에서 변경한 무관한 설정을 유지한�
   await api.savePatch({ hideAds: true });
   assert.equal(data.darkMode, true); assert.equal(data.hideAds, true); assert.deepEqual(data.blockUsers, ['keep-me']);
 });
+
+test('댓글 규칙은 실제 판정 길이 제한을 넘어 저장할 수 없다', async () => {
+  const { api, data } = setup();
+  await assert.rejects(api.savePatch({ botCommentAllowlist: ['x'.repeat(601)] }), /600/);
+  await assert.rejects(api.savePatch({ botCommentExamples: ['x'.repeat(601)] }), /600/);
+  assert.equal(data.botCommentAllowlist, undefined);
+});
 test('설정 정규화는 알 수 없는 키를 저장하지 않고 삭제된 값은 기본값으로 복구한다', () => {
   const { api } = setup(); const result = api.normalizeSettings({ enabled: undefined, alien: 'data', systemTheme: true });
   assert.equal(result.enabled, true); assert.equal(result.alien, undefined); assert.equal(result.systemTheme, true);

@@ -64,6 +64,8 @@ html:is(:not(.dcf-safety-ready), .dcf-safety-on) :is(
   pointer-events: none !important;
 }
 .dcf-safety-revealed button { pointer-events: auto !important; }
+.dcf-safety-cover button:disabled { opacity: .7; cursor: wait; }
+.dcf-safety-revealed .dcf-safety-control-error { background: #fff; color: #9b1c1c !important; padding: 4px; }
 .dcf-safety-small { padding: 3px; gap: 3px; }
 .dcf-safety-small small { display: none; }
 .dcf-safety-small strong { font-size: 11px !important; }

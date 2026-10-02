@@ -8,6 +8,7 @@ try {
     $files = @('manifest.json','README.md','icons/icon16.png','icons/icon48.png','icons/icon128.png','popup/popup.html','popup/popup.css','popup/popup.js','popup/boot.js','src/storage.js','src/early.js','src/reading-state.js','src/reading.js','src/content.js','src/content.css','src/rules.json','src/image-worker.html','src/image-worker.js')
     $files += @('src/safety-guard.js','src/safety.css','src/safety-worker.html','src/safety-worker.js','src/safety-policy.js','THIRD-PARTY-NOTICES.md','models/clip-vit-base-patch32/asset-integrity.json')
     $files += @('src/comment-policy.js','src/bot-comments.js','src/bot-comments.css')
+    $files += @('src/background.js','src/image-allowlist.js','src/release-updates.js','popup/updates.js','popup/gallery-profiles.js','popup/image-allowlist-ui.js')
     if (Test-Path -LiteralPath 'LICENSE' -PathType Leaf) { $files += 'LICENSE' }
     $assets = Get-Content -LiteralPath 'models/clip-vit-base-patch32/asset-integrity.json' -Raw | ConvertFrom-Json
     $files += @($assets.files | ForEach-Object { $_.path })

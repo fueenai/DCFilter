@@ -8,6 +8,13 @@ const SAFETY_MAX_PENDING = 32;
 let safetyModelPromise;
 let safetyQueue = Promise.resolve();
 const safetyPending = new Set();
+const safetyVerdicts = new Map();
+
+function unsupportedSafety(reason) {
+  const error = new Error(reason);
+  error.safetyUnsupported = true;
+  return error;
+}
 
 window.addEventListener("message", (event) => {
   const message = event.data;
@@ -15,7 +22,7 @@ window.addEventListener("message", (event) => {
   if (!message || message.type !== SAFETY_REQUEST || typeof message.requestId !== "string" ||
       !message.requestId || message.requestId.length > 128 || safetyPending.has(message.requestId)) return;
   if (safetyPending.size >= SAFETY_MAX_PENDING) {
-    respondSafety(message.requestId, { status: "uncertain", reason: "검사 대기 이미지가 많아 계속 가립니다." });
+    respondSafety(message.requestId, { status: "error", reason: "검사 대기 이미지가 많습니다. 잠시 뒤 다시 검사해 주세요." }, false);
     return;
   }
   safetyPending.add(message.requestId);
@@ -26,7 +33,7 @@ window.addEventListener("message", (event) => {
       const result = await classifySafetyImage(message.url, message.referrer, message);
       respondSafety(message.requestId, result);
     } catch (error) {
-      respondSafety(message.requestId, { status: "uncertain", reason: safetyErrorMessage(error) }, false);
+      respondSafety(message.requestId, { status: error?.safetyUnsupported ? "unsupported" : "error", reason: safetyErrorMessage(error) }, false);
     } finally {
       safetyPending.delete(message.requestId);
     }
@@ -59,24 +66,28 @@ function loadSafetyModel() {
         executionProviders: ["wasm"], graphOptimizationLevel: "all"
       });
       return { session, prompts: data.prompts };
-    })();
+    })().catch((error) => { safetyModelPromise = null; throw error; });
   }
   return safetyModelPromise;
 }
 
 async function fetchSafetyImage(rawUrl, rawReferrer) {
-  const url = DCFSafetyPolicy.validateImageUrl(rawUrl);
+  let url;
+  try { url = DCFSafetyPolicy.validateImageUrl(rawUrl); }
+  catch (error) { throw unsupportedSafety(error.message); }
   const referrer = new URL(String(rawReferrer || ""));
   if (referrer.origin !== SAFETY_PARENT_ORIGIN || referrer.username || referrer.password) throw new Error("게시글 주소를 확인할 수 없습니다.");
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
   try {
     // Reject redirects rather than sending any request to an unapproved host.
-    const response = await fetch(url.href, { credentials: "omit", cache: "force-cache", redirect: "error",
+    // A URL can serve different bytes later. Re-read before using any hash-based
+    // permission or verdict; URL-only decisions would expose a replacement.
+    const response = await fetch(url.href, { credentials: "omit", cache: "no-store", redirect: "error",
       referrer: referrer.href, referrerPolicy: "unsafe-url", signal: controller.signal });
     if (!response.ok) throw new Error(`이미지를 불러오지 못해 계속 가립니다. (HTTP ${response.status})`);
     DCFSafetyPolicy.validateImageUrl(response.url || url.href);
-    if (Number(response.headers.get("content-length")) > DCFSafetyPolicy.MAX_IMAGE_BYTES) throw new Error("12MB가 넘는 이미지는 계속 가립니다.");
+    if (Number(response.headers.get("content-length")) > DCFSafetyPolicy.MAX_IMAGE_BYTES) throw unsupportedSafety("12MB가 넘는 이미지는 자동 검사하지 않습니다.");
     if (!response.body) throw new Error("이미지 데이터가 없습니다.");
     const reader = response.body.getReader();
     const chunks = [];
@@ -88,7 +99,7 @@ async function fetchSafetyImage(rawUrl, rawReferrer) {
         length += value.byteLength;
         if (length > DCFSafetyPolicy.MAX_IMAGE_BYTES) {
           controller.abort();
-          throw new Error("12MB가 넘는 이미지는 계속 가립니다.");
+          throw unsupportedSafety("12MB가 넘는 이미지는 자동 검사하지 않습니다.");
         }
         chunks.push(value);
       }
@@ -106,11 +117,22 @@ async function classifySafetyImage(rawUrl, rawReferrer, options) {
 }
 
 // A normal lexical function for browser verification, not an extra public message API.
-async function classifySafetyBytes(bytes, options) {
-  const format = DCFSafetyPolicy.inspectImageBytes(bytes);
+async function classifySafetyBytes(bytes, options = {}) {
+  let format;
+  try { format = DCFSafetyPolicy.inspectImageBytes(bytes); }
+  catch (error) { throw unsupportedSafety(error.message); }
   const bitmap = await createImageBitmap(new Blob([bytes], { type: format.type }));
   try {
-    DCFSafetyPolicy.checkDimensions(bitmap.width, bitmap.height);
+    try { DCFSafetyPolicy.checkDimensions(bitmap.width, bitmap.height); }
+    catch (error) { throw unsupportedSafety(error.message); }
+    const digestBytes = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+    const contentDigest = Array.from(digestBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    // A missing/unreadable allowlist must never grant permission.
+    let allowed = false;
+    try { allowed = await DCFImageAllowlist.has(contentDigest); } catch (_error) {}
+    if (allowed) return { status: "allowed", contentDigest, reason: "이 PC에서 항상 보기로 허용한 이미지입니다." };
+    const cacheKey = `${options.sexual !== false}:${options.sensitivity === "balanced" ? "balanced" : "strict"}:${contentDigest}`;
+    if (safetyVerdicts.has(cacheKey)) return safetyVerdicts.get(cacheKey);
     const model = await loadSafetyModel();
     const regions = safetyImageRegions(bitmap.width, bitmap.height);
     let finalResult = { status: "safe", score: 0, reason: "로컬 AI 검사 통과" };
@@ -120,7 +142,7 @@ async function classifySafetyBytes(bytes, options) {
       try {
         output = await model.session.run({ pixel_values: input });
         const result = DCFSafetyPolicy.classifyEmbedding(output.image_embeds.data, model.prompts, options);
-        if (result.status === "blocked") return result;
+        if (result.status === "blocked") return rememberSafetyVerdict(cacheKey, { ...result, contentDigest });
         if ((result.status === "uncertain" && finalResult.status === "safe") ||
             (result.status === finalResult.status && result.score > finalResult.score)) finalResult = result;
       } finally {
@@ -130,8 +152,14 @@ async function classifySafetyBytes(bytes, options) {
     }
     // Only a completed scan of every region may relax an ambiguous verdict.
     // Decode/model failures and skipped formats never receive this marker.
-    return { ...finalResult, analysisComplete: true };
+    return rememberSafetyVerdict(cacheKey, { ...finalResult, contentDigest, analysisComplete: true });
   } finally { bitmap.close(); }
+}
+
+function rememberSafetyVerdict(key, result) {
+  if (safetyVerdicts.size >= 180) safetyVerdicts.delete(safetyVerdicts.keys().next().value);
+  safetyVerdicts.set(key, result);
+  return result;
 }
 
 function safetyImageRegions(width, height) {

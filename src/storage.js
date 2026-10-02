@@ -42,6 +42,7 @@
     blockUsers: [],
     botCommentFilter: true,
     botCommentSensitivity: "balanced",
+    botCommentAllowlist: [],
     botCommentExamples: [
       "맞아. 요즘같은 AI시대에서 커뮤니티 실명제는 꽤나 합리적인 제도일 수 있어.",
       "목소리 복제 진짜 정교해져서 찝찝하긴 하네",
@@ -56,6 +57,8 @@
   });
 
   const LEGACY_DEFAULT_ACCENT = "#3b82f6";
+  const PROFILE_PREFIX = "galleryProfile:";
+  const PROFILE_KEYS = Object.freeze(["imageSafety", "imageSafetySexual", "imageSafetyHideUncertain", "imageSafetySensitivity", "botCommentFilter", "botCommentSensitivity", "blockKeywords"]);
 
   const FONT_OPTIONS = Object.freeze([
     { id: "default", label: "기본" },
@@ -178,6 +181,7 @@
     merged.blockKeywords = normalizeList(merged.blockKeywords);
     merged.blockUsers = normalizeList(merged.blockUsers);
     merged.botCommentExamples = normalizeList(merged.botCommentExamples).slice(0, 100);
+    merged.botCommentAllowlist = normalizeList(merged.botCommentAllowlist).slice(0, 100);
     return merged;
   }
 
@@ -186,14 +190,70 @@
     return Math.min(max, Math.max(min, value));
   }
 
-  function loadSettings() {
+  function loadGlobalSettings() {
     return chrome.storage.sync.get(DEFAULTS).then((raw) => normalizeSettings(raw));
   }
 
+  function validGalleryKey(key) {
+    return typeof key === "string" && /^(major|minor|mini|person):[a-z0-9_-]{1,80}$/.test(key);
+  }
+
+  function galleryKeyFromUrl(raw) {
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== "https:" || url.hostname !== "gall.dcinside.com" || url.username || url.password || url.port) return "";
+      const match = url.pathname.match(/^\/(?:(mgallery|mini|person)\/)?board\/(?:lists|view)\/?$/);
+      if (!match) return "";
+      const type = { mgallery: "minor", mini: "mini", person: "person" }[match[1]] || "major";
+      const key = `${type}:${url.searchParams.get("id") || ""}`;
+      return validGalleryKey(key) ? key : "";
+    } catch (_error) { return ""; }
+  }
+
+  function normalizeProfile(raw) {
+    const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    const normalized = normalizeSettings(source);
+    return Object.fromEntries(PROFILE_KEYS.filter(key => Object.hasOwn(source, key) && source[key] !== undefined).map(key => [key, normalized[key]]));
+  }
+
+  async function loadGalleryProfile(key) {
+    if (!validGalleryKey(key)) return {};
+    const name = PROFILE_PREFIX + key;
+    return normalizeProfile((await chrome.storage.sync.get({ [name]: {} }))[name]);
+  }
+
+  async function loadSettings(key) {
+    const gallery = key === undefined ? galleryKeyFromUrl(globalThis.location?.href || globalThis.window?.location?.href) : key;
+    const [common, profile] = await Promise.all([loadGlobalSettings(), loadGalleryProfile(gallery)]);
+    return normalizeSettings({ ...common, ...profile });
+  }
+
+  function isSettingsChange(changes) {
+    return Object.keys(changes).some(key => Object.hasOwn(DEFAULTS, key) || key.startsWith(PROFILE_PREFIX));
+  }
+
+  async function listGalleryProfiles() {
+    const raw = await chrome.storage.sync.get(null);
+    return Object.fromEntries(Object.entries(raw).filter(([key]) => key.startsWith(PROFILE_PREFIX) && validGalleryKey(key.slice(PROFILE_PREFIX.length))).map(([key, value]) => [key.slice(PROFILE_PREFIX.length), normalizeProfile(value)]));
+  }
+
+  async function saveGalleryProfile(key, patch) {
+    if (!validGalleryKey(key)) throw new Error("갤러리 주소를 확인하세요.");
+    const profile = normalizeProfile(patch);
+    const name = PROFILE_PREFIX + key;
+    if (new TextEncoder().encode(name + JSON.stringify(profile)).length > 7800) throw new Error("이 갤러리 설정이 너무 큽니다. 키워드를 줄여 주세요.");
+    if (Object.keys(profile).length) await chrome.storage.sync.set({ [name]: profile });
+    else await chrome.storage.sync.remove(name);
+    return profile;
+  }
+
   function validateSettings(settings) {
-    for (const key of ["blockKeywords", "blockUsers", "botCommentExamples"]) {
+    for (const key of ["botCommentExamples", "botCommentAllowlist"]) {
+      if (settings[key].some(text => text.length > 600)) throw new Error(`${key === "botCommentExamples" ? "봇 댓글 예시" : "댓글 허용"}는 문장 하나당 600자 이하로 입력하세요.`);
+    }
+    for (const key of ["blockKeywords", "blockUsers", "botCommentExamples", "botCommentAllowlist"]) {
       if (new TextEncoder().encode(key + JSON.stringify(settings[key])).length > 7800) {
-        const label = key === "botCommentExamples" ? "봇 댓글 예시" : key === "blockKeywords" ? "키워드 차단" : "사용자 차단";
+        const label = key === "botCommentAllowlist" ? "댓글 허용" : key === "botCommentExamples" ? "봇 댓글 예시" : key === "blockKeywords" ? "키워드 차단" : "사용자 차단";
         throw new Error(`${label} 목록이 너무 큽니다. 항목을 줄인 뒤 다시 저장하세요.`);
       }
     }
@@ -206,10 +266,13 @@
     return chrome.storage.sync.set(normalized).then(() => normalized);
   }
 
-  async function savePatch(patch) {
-    const latest = await loadSettings();
+  async function savePatch(patch, profiles = null) {
+    const latest = await loadGlobalSettings();
     const normalized = validateSettings(normalizeSettings(Object.assign({}, latest, patch)));
     const changed = Object.fromEntries(Object.keys(patch).filter((key) => Object.hasOwn(DEFAULTS, key)).map((key) => [key, normalized[key]]));
+    if (profiles !== null) {
+      for (const [key, profile] of Object.entries(validateProfiles(profiles))) changed[PROFILE_PREFIX + key] = profile;
+    }
     await chrome.storage.sync.set(changed);
     return normalized;
   }
@@ -225,7 +288,44 @@
     return validateSettings(normalizeSettings(data.settings));
   }
 
-  window.DCFilterStorage = {
+  function validateProfiles(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw) || Object.keys(raw).length > 512) throw new Error("갤러리별 설정 형식이 올바르지 않습니다.");
+    const entries = [];
+    for (const [key, value] of Object.entries(raw)) {
+      if (!validGalleryKey(key) || !value || typeof value !== "object" || Array.isArray(value)) throw new Error("갤러리별 설정 형식이 올바르지 않습니다.");
+      for (const name of PROFILE_KEYS) if (Object.hasOwn(value, name)) {
+        const item = value[name];
+        if (Array.isArray(DEFAULTS[name]) ? !Array.isArray(item) || item.some(word => typeof word !== "string") : typeof item !== typeof DEFAULTS[name]) throw new Error("갤러리 설정의 값 형식이 올바르지 않습니다.");
+      }
+      const profile = normalizeProfile(value);
+      if (new TextEncoder().encode(PROFILE_PREFIX + key + JSON.stringify(profile)).length > 7800) throw new Error("갤러리 설정의 키워드 목록이 너무 큽니다.");
+      entries.push([key, profile]);
+    }
+    return Object.fromEntries(entries);
+  }
+
+  async function createBackup() {
+    const [settings, galleryProfiles] = await Promise.all([loadGlobalSettings(), listGalleryProfiles()]);
+    return { app: "DCFilter", schema: 2, settings, galleryProfiles };
+  }
+
+  function parseBackupBundle(text) {
+    if (text.length > 100000) throw new Error("설정 파일은 100KB 이하만 불러올 수 있습니다.");
+    const data = JSON.parse(text);
+    if (data?.schema === 1) return { settings: parseBackup(text), galleryProfiles: null };
+    if (data?.schema !== 2) throw new Error("DCFilter에서 내보낸 설정 파일을 선택하세요.");
+    const settings = parseBackup(JSON.stringify({ ...data, schema: 1 }));
+    return { settings, galleryProfiles: validateProfiles(data.galleryProfiles) };
+  }
+
+  async function updateCommentRule(text, action) {
+    const response = await chrome.runtime.sendMessage({ type: "dcf:comment-rule", text, action });
+    if (!response?.ok) throw new Error(response?.error || "댓글 규칙을 저장하지 못했습니다.");
+    return loadSettings();
+  }
+
+  const root = typeof window === "object" ? window : globalThis;
+  root.DCFilterStorage = {
     DEFAULTS,
     FONT_OPTIONS,
     FONT_STACKS,
@@ -235,6 +335,19 @@
     normalizeList,
     normalizeSettings,
     loadSettings,
+    loadGlobalSettings,
+    PROFILE_KEYS,
+    PROFILE_PREFIX,
+    validGalleryKey,
+    galleryKeyFromUrl,
+    normalizeProfile,
+    loadGalleryProfile,
+    listGalleryProfiles,
+    saveGalleryProfile,
+    isSettingsChange,
+    updateCommentRule,
+    createBackup,
+    parseBackupBundle,
     saveSettings,
     savePatch,
     parseBackup

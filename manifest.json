@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "DCFilter",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "description": "디시인사이드 봇 의심 댓글 접기, 로컬 AI 이미지 사전 차단, UI 정리, 읽음 표시, 자짤 차단 및 작성자 분석.",
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://*.dcinside.com https://*.dcinside.co.kr"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://*.dcinside.com https://*.dcinside.co.kr https://api.github.com"
   },
   "action": {
     "default_title": "DCFilter 설정",
@@ -19,10 +19,12 @@
     "storage",
     "declarativeNetRequestWithHostAccess"
   ],
+  "background": { "service_worker": "src/background.js" },
   "host_permissions": [
     "https://gall.dcinside.com/*",
     "https://*.dcinside.com/*",
-    "https://*.dcinside.co.kr/*"
+    "https://*.dcinside.co.kr/*",
+    "https://api.github.com/*"
   ],
   "declarative_net_request": {
     "rule_resources": [
@@ -40,6 +42,7 @@
       ],
       "js": [
         "src/storage.js",
+        "src/image-allowlist.js",
         "src/early.js",
         "src/safety-guard.js"
       ],

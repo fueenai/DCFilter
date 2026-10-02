@@ -5,6 +5,7 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 process.chdir(root);
 const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+if (manifest.background?.service_worker && !fs.existsSync(manifest.background.service_worker)) throw new Error('Missing service worker');
 const refs = [...manifest.content_scripts.flatMap(s => [...(s.js || []), ...(s.css || [])]), ...Object.values(manifest.icons), manifest.action.default_popup, ...manifest.declarative_net_request.rule_resources.map(r => r.path), ...manifest.web_accessible_resources.flatMap(r => r.resources)];
 for (const ref of refs) if (!fs.existsSync(ref)) throw new Error('Missing manifest file: '+ref);
 const assets = JSON.parse(fs.readFileSync('models/clip-vit-base-patch32/asset-integrity.json', 'utf8'));
@@ -14,7 +15,7 @@ for (const item of assets.files) {
   const bytes = fs.readFileSync(fullPath);
   if (bytes.length !== item.bytes || crypto.createHash('sha256').update(bytes).digest('hex') !== item.sha256) throw new Error('Local AI asset mismatch: ' + item.path);
 }
-for (const file of ['src/image-worker.html', 'src/safety-worker.html']) {
+for (const file of ['src/image-worker.html', 'src/safety-worker.html', 'popup/popup.html']) {
   const source = fs.readFileSync(file, 'utf8');
   for (const match of source.matchAll(/<script[^>]+src="([^"]+)"/g)) {
     if (!fs.existsSync(path.resolve(path.dirname(file), match[1]))) throw new Error('Missing worker script: ' + match[1]);

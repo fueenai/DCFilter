@@ -56,6 +56,7 @@
     botCommentFilter: document.getElementById("botCommentFilter"),
     botCommentSensitivity: document.getElementById("botCommentSensitivity"),
     botCommentExamples: document.getElementById("botCommentExamples"),
+    botCommentAllowlist: document.getElementById("botCommentAllowlist"),
     save: document.getElementById("save"),
     reset: document.getElementById("reset"),
     saveStatus: document.getElementById("saveStatus"),
@@ -72,6 +73,7 @@
   let readCountTimer = 0;
   let clearingReadHistory = false;
   let saving = false;
+  let pendingProfiles = null;
   let activeSection = "settings-list";
   const search = document.getElementById("settingsSearch");
   const discard = document.getElementById("discard");
@@ -99,18 +101,25 @@
     controls.reset.addEventListener("click", reset);
     controls.clearBlockedImages.addEventListener("click", clearBlockedImages);
     controls.clearReadHistory.addEventListener("click", clearReadHistory);
-    discard.addEventListener("click", () => render(JSON.parse(baseline), { setBaseline: true }));
+    discard.addEventListener("click", () => { pendingProfiles = null; render(JSON.parse(baseline), { setBaseline: true }); });
     search.addEventListener("input", filterSections);
     document.getElementById("clearSearch").addEventListener("click", () => { search.value = ""; filterSections(); search.focus(); });
     document.getElementById("exportSettings").addEventListener("click", exportSettings);
     document.getElementById("importSettings").addEventListener("click", () => document.getElementById("importFile").click());
     document.getElementById("importFile").addEventListener("change", importSettings);
     document.addEventListener("keydown", (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); if (!controls.save.disabled) save(); }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        if (event.target.closest?.("#galleryProfileEditor")) {
+          const profileSave = document.getElementById("profileSave");
+          if (!profileSave.disabled) profileSave.click();
+        } else if (!controls.save.disabled) save();
+      }
       if (event.key === "Escape" && search.value) { search.value = ""; filterSections(); search.focus(); }
     });
 
     document.querySelectorAll("input:not([type='search']):not([type='file']), select, textarea").forEach((control) => {
+      if (control.closest("#galleryProfileEditor")) return;
       control.addEventListener("input", handleFormInput);
       control.addEventListener("change", handleFormInput);
     });
@@ -207,6 +216,7 @@
     controls.botCommentFilter.checked = normalized.botCommentFilter;
     controls.botCommentSensitivity.value = normalized.botCommentSensitivity;
     controls.botCommentExamples.value = normalized.botCommentExamples.join("\n");
+    controls.botCommentAllowlist.value = normalized.botCommentAllowlist.join("\n");
 
     if (options && options.setBaseline) baseline = serialize(normalized);
     syncUiState();
@@ -271,12 +281,12 @@
   }
 
   function syncDirtyState() {
-    const dirty = serialize(readForm()) !== baseline;
+    const dirty = serialize(readForm()) !== baseline || pendingProfiles !== null;
     document.documentElement.classList.toggle("is-dirty", dirty);
     controls.save.disabled = saving || !dirty;
     discard.disabled = saving || !dirty;
     controls.saveState.classList.remove("is-success");
-    controls.saveStatus.textContent = dirty ? "저장하지 않은 변경" : "모든 설정 저장됨";
+    controls.saveStatus.textContent = dirty ? "저장하지 않은 공통 설정" : "공통 설정 저장됨";
     // boot.js replays this on the next open. Only a saved state is worth
     // replaying; an unsaved preview would open the popup in the wrong theme.
     if (!dirty) rememberTheme();
@@ -351,6 +361,7 @@
       botCommentFilter: controls.botCommentFilter.checked,
       botCommentSensitivity: controls.botCommentSensitivity.value,
       botCommentExamples: controls.botCommentExamples.value.split(/\r?\n/),
+      botCommentAllowlist: controls.botCommentAllowlist.value.split(/\r?\n/),
       blockUsers: controls.blockUsers.value.split(/\r?\n/)
     });
   }
@@ -428,12 +439,14 @@
     saving = true;
     clearStatusTimer();
     const draft = readForm();
+    const submittedProfiles = pendingProfiles;
     const previous = JSON.parse(baseline);
     const patch = Object.fromEntries(Object.entries(draft).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(previous[key])));
     controls.save.disabled = true;
     controls.save.textContent = "저장 중";
     try {
-      const saved = await storage.savePatch(patch);
+      const saved = await storage.savePatch(patch, submittedProfiles);
+      if (pendingProfiles === submittedProfiles) pendingProfiles = null;
       // 저장 대기 중 바뀐 입력은 그대로 남겨 다음 저장에서 반영한다.
       if (serialize(readForm()) === serialize(draft)) render(saved, { setBaseline: true });
       else baseline = serialize(saved);
@@ -445,7 +458,7 @@
     } finally {
       controls.save.textContent = "저장";
       saving = false;
-      controls.save.disabled = serialize(readForm()) === baseline;
+      controls.save.disabled = serialize(readForm()) === baseline && pendingProfiles === null;
       discard.disabled = controls.save.disabled;
     }
   }
@@ -453,6 +466,7 @@
   async function reset() {
     if (!window.confirm("화면 설정과 키워드·사용자 차단 목록을 기본값으로 되돌릴까요? 읽음 기록과 자짤 지문은 유지됩니다. 저장 전에는 되돌릴 수 있습니다.")) return;
     clearStatusTimer();
+    pendingProfiles = null;
     render(storage.DEFAULTS);
     controls.saveStatus.textContent = "기본값을 확인한 뒤 저장하세요";
   }
@@ -498,14 +512,16 @@
 
   async function exportSettings() {
     try {
-      const settings = await storage.loadSettings();
-      const blob = new Blob([JSON.stringify({ app: "DCFilter", schema: 1, version: chrome.runtime.getManifest().version, settings }, null, 2)], {type: "application/json"});
+      const backup = await storage.createBackup();
+      const text = JSON.stringify({ ...backup, version: chrome.runtime.getManifest().version }, null, 2);
+      if (new TextEncoder().encode(text).length > 100000) throw new Error("설정 파일이 100KB를 넘습니다. 목록을 줄인 뒤 다시 내보내세요.");
+      const blob = new Blob([text], {type: "application/json"});
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url; link.download = "DCFilter-settings.json"; link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       flashStatus("저장된 설정을 내보냈습니다");
-    } catch (_error) { controls.saveStatus.textContent = "내보내지 못했습니다. 다시 시도해 주세요."; }
+    } catch (error) { controls.saveStatus.textContent = error.message || "내보내지 못했습니다. 다시 시도해 주세요."; }
   }
 
   async function importSettings(event) {
@@ -513,10 +529,11 @@
     if (!file) return;
     try {
       if (file.size > 100000) throw new Error("설정 파일은 100KB 이하만 불러올 수 있습니다.");
-      const settings = storage.parseBackup(await file.text());
-      if (serialize(readForm()) !== baseline && !window.confirm("저장하지 않은 변경을 불러온 설정으로 바꿀까요?")) return;
-      render(settings);
-      controls.saveStatus.textContent = "불러온 설정을 확인한 뒤 저장하세요";
+      const backup = storage.parseBackupBundle(await file.text());
+      if ((serialize(readForm()) !== baseline || pendingProfiles !== null) && !window.confirm("저장하지 않은 변경을 불러온 설정으로 바꿀까요?")) return;
+      pendingProfiles = backup.galleryProfiles;
+      render(backup.settings);
+      controls.saveStatus.textContent = pendingProfiles === null ? "불러온 설정을 확인한 뒤 저장하세요" : `저장하면 공통 설정과 갤러리 설정 ${Object.keys(pendingProfiles).length}개를 적용합니다`;
     } catch (error) { controls.saveStatus.textContent = error instanceof SyntaxError ? "JSON 파일을 읽지 못했습니다. DCFilter 백업 파일을 선택하세요." : error.message; }
     finally { event.target.value = ""; }
   }

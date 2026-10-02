@@ -7,6 +7,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const { webcrypto, createHash } = require("node:crypto");
 const policy = require("../src/safety-policy.js");
 const source = fs.readFileSync(path.join(__dirname, "../src/safety-worker.js"), "utf8");
 const origin = "https://gall.dcinside.com";
@@ -24,7 +25,7 @@ function fixture(options = {}) {
   const inputTensors = [];
   const outputTensors = [];
   const draws = [];
-  const state = { runs: 0, classifications: 0, modelLoads: 0, bitmapCreates: 0, bitmapCloses: 0 };
+  const state = { runs: 0, classifications: 0, modelLoads: 0, bitmapCreates: 0, bitmapCloses: 0, imageFetches: 0 };
   const stages = options.stages || [];
   const handlers = {};
   const parent = { postMessage(message, target) {
@@ -57,7 +58,8 @@ function fixture(options = {}) {
   const context = vm.createContext({
     window: { addEventListener(name, handler) { handlers[name] = handler; } },
     parent, location: { href: "chrome-extension://test/src/safety-worker.html" },
-    URL, Blob, Uint8Array, Float32Array, AbortController, setTimeout, clearTimeout,
+    URL, Blob, Uint8Array, Float32Array, AbortController, setTimeout, clearTimeout, crypto: webcrypto,
+    DCFImageAllowlist: { async has(digest) { return options.allowed?.has(digest) || false; } },
     ort,
     DCFSafetyPolicy: { ...policy, classifyEmbedding(data) {
       state.classifications++;
@@ -65,15 +67,17 @@ function fixture(options = {}) {
       if (stage.policyError) throw stage.policyError;
       return stage.result || { status: "safe", score: .01, reason: "fixture safe" };
     } },
-    async fetch(url) {
+    async fetch(url, request) {
       if (String(url).endsWith("safety-prompts.json")) {
         return { ok: true, async json() { return options.prompts || { version: 1, prompts: Array(41).fill({}) }; } };
       }
       if (options.fetchError) throw options.fetchError;
+      assert.equal(request.cache, "no-store", "a cached URL must never authorize changed bytes");
+      state.imageFetches++;
       let sent = false;
       return { ok: true, url: String(url), headers: { get() { return null; } },
         body: { getReader() { return {
-          async read() { if (sent) return { done: true }; sent = true; return { done: false, value: options.bytes || png }; },
+          async read() { if (sent) return { done: true }; sent = true; return { done: false, value: typeof options.bytes === "function" ? options.bytes() : options.bytes || png }; },
           releaseLock() {}
         }; } } };
     },
@@ -162,7 +166,7 @@ test("later inference failure discards prior uncertain verdict without a complet
   ] });
   const message = await worker.dispatch();
   assert.equal(message.ok, false);
-  assert.equal(message.result.status, "uncertain");
+  assert.equal(message.result.status, "error");
   assertNoCompletion(message);
   assert.equal(worker.state.runs, 3);
   assert.equal(worker.state.bitmapCloses, 1);
@@ -182,7 +186,7 @@ test("decode, model, malformed model, fetch and unsupported-format failures cann
     const worker = fixture(options);
     const message = await worker.dispatch();
     assert.equal(message.ok, false);
-    assert.equal(message.result.status, "uncertain");
+    assert.equal(message.result.status, name === "unsupported GIF" ? "unsupported" : "error");
     assertNoCompletion(message);
     assert.equal(worker.state.runs, 0);
     assert.equal(worker.state.bitmapCreates, creates);
@@ -226,4 +230,57 @@ test("ambiguous verdict survives later safe tiles and retains the strongest ambi
   assert.equal(result.score, .6);
   assert.equal(result.reason, "second ambiguous");
   assert.equal(result.analysisComplete, true);
+});
+
+test("persistent permission skips inference only for identical supported bytes and revocation applies", async () => {
+  const digest = createHash("sha256").update(png).digest("hex");
+  const allowed = new Set([digest]);
+  const worker = fixture({ allowed });
+  const first = await worker.dispatch("allowed");
+  assert.equal(first.result.status, "allowed");
+  assert.equal(first.result.contentDigest, digest);
+  assert.equal(worker.state.modelLoads, 0);
+  assert.equal(worker.state.runs, 0);
+  allowed.delete(digest);
+  const second = await worker.dispatch("revoked");
+  assert.equal(second.result.status, "safe");
+  assert.equal(worker.state.runs, 4);
+  assert.equal(worker.state.imageFetches, 2);
+});
+
+test("same URL with new bytes is classified instead of borrowing remembered permission", async () => {
+  const digest = createHash("sha256").update(png).digest("hex");
+  // Change the last byte; decoder is mocked, byte identity is real WebCrypto.
+  const changed = png.slice(); changed[changed.length - 1] ^= 1;
+  let bytes = png;
+  const worker = fixture({ allowed: new Set([digest]), bytes: () => bytes,
+    stages: [{ result: { status: "blocked", reason: "changed image" } }] });
+  assert.equal((await worker.dispatch("first")).result.status, "allowed");
+  bytes = changed;
+  const replacement = await worker.dispatch("replacement");
+  assert.equal(replacement.result.status, "blocked");
+  assert.notEqual(replacement.result.contentDigest, digest);
+  assert.equal(worker.state.runs, 1);
+});
+
+test("transient fetch and model errors can be retried and are never cached", async () => {
+  const options = { fetchError: new Error("temporary fetch failure"), modelError: new Error("temporary model failure") };
+  const worker = fixture(options);
+  assert.equal((await worker.dispatch("fetch-error")).result.status, "error");
+  options.fetchError = null;
+  assert.equal((await worker.dispatch("model-error")).result.status, "error");
+  options.modelError = null;
+  const retried = await worker.dispatch("retry");
+  assert.equal(retried.result.status, "safe");
+  assert.equal(worker.state.modelLoads, 2);
+  assert.equal(worker.state.runs, 4);
+});
+
+test("allowlist cannot bypass unsupported animated image checks", async () => {
+  const bytes = Uint8Array.from(Buffer.from("GIF89a"));
+  const worker = fixture({ bytes, allowed: new Set([createHash("sha256").update(bytes).digest("hex")]) });
+  const result = await worker.dispatch();
+  assert.equal(result.result.status, "unsupported");
+  assert.equal(worker.state.modelLoads, 0);
+  assert.equal(result.result.contentDigest, undefined);
 });

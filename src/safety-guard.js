@@ -16,9 +16,9 @@
   const REQUEST = "dcf:safety:request";
   const RESPONSE = "dcf:safety:response";
   const records = new Map();
-  const cache = new Map();
   const queue = [];
   const storage = window.DCFilterStorage;
+  const allowlist = window.DCFImageAllowlist;
   const root = document.documentElement;
   let settings = storage.DEFAULTS;
   let ready = false;
@@ -32,7 +32,7 @@
   let pending = null;
   let layoutFrame = 0;
   let settingsError = false;
-  const initialChanges = {};
+  let settingsRequest = 0;
   const workerUrl = chrome.runtime.getURL("src/safety-worker.html");
   const workerOrigin = new URL(workerUrl).origin;
 
@@ -81,7 +81,8 @@
   document.addEventListener("load", (event) => {
     const record = records.get(event.target);
     if (!record) return;
-    if (record.source !== sourceOf(record.media)) reset(record);
+    // A second load can replace bytes at the very same URL.
+    reset(record);
     enqueue(record);
     scheduleLayout();
   }, true);
@@ -89,7 +90,7 @@
     const record = records.get(event.target);
     if (!active || !record) return;
     record.generation += 1;
-    settle(record, { status: "uncertain", reason: "이미지를 불러오지 못해 가렸습니다." });
+    settle(record, { status: "error", reason: "이미지를 불러오지 못했습니다. 다시 검사할 수 있습니다." });
   }, true);
   document.addEventListener("loadeddata", (event) => {
     const record = records.get(event.target);
@@ -108,28 +109,51 @@
   document.addEventListener("DOMContentLoaded", () => { discover(root); refreshLayout(); }, { once: true });
   discover(root);
 
-  storage.loadSettings().then((initial) => configure(storage.normalizeSettings({ ...initial, ...initialChanges }))).catch(() => {
-    const latest = storage.normalizeSettings({ ...settings, ...initialChanges });
-    if (!latest.enabled || !latest.imageSafety) { configure(latest); return; }
-    settings = latest;
-    settingsError = true;
-    ready = true;
-    root.classList.add("dcf-safety-on", "dcf-safety-ready");
-    for (const record of records.values()) {
-      record.settingsError = true;
-      settle(record, { status: "uncertain", reason: "설정을 읽지 못해 가렸습니다." });
-    }
-  });
+  reloadSettings();
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== "sync") return;
-    if (!ready) {
-      for (const [key, value] of Object.entries(changes)) initialChanges[key] = value.newValue;
+    if (area === "local" && allowlist.isChange(changes)) {
+      refreshPermissions(changes);
       return;
     }
-    const next = { ...settings };
-    for (const [key, value] of Object.entries(changes)) next[key] = value.newValue;
-    configure(storage.normalizeSettings(next));
+    if (area !== "sync" || storage.isSettingsChange && !storage.isSettingsChange(changes)) return;
+    reloadSettings();
   });
+
+  async function reloadSettings() {
+    const request = ++settingsRequest;
+    try {
+      const next = await storage.loadSettings();
+      if (request === settingsRequest) configure(next);
+    } catch (_error) {
+      if (request !== settingsRequest) return;
+      settingsError = true;
+      ready = true;
+      root.classList.toggle("dcf-safety-on", active);
+      root.classList.add("dcf-safety-ready");
+      for (const record of records.values()) {
+        record.settingsError = true;
+        record.generation += 1;
+        settle(record, { status: "error", reason: "설정을 읽지 못했습니다. 다시 검사할 수 있습니다." });
+      }
+    }
+  }
+
+  async function refreshPermissions(changes) {
+    for (const record of records.values()) {
+      const digest = record.contentDigest;
+      if (!digest || !Object.hasOwn(changes, allowlist.PREFIX + digest)) continue;
+      const generation = record.generation;
+      try {
+        const allowed = await allowlist.has(digest);
+        if (generation !== record.generation || digest !== record.contentDigest) continue;
+        record.remembered = allowed;
+        if (!allowed) reset(record);
+        else applyRecord(record);
+      } catch (_error) {
+        if (generation === record.generation) reset(record);
+      }
+    }
+  }
 
   function configure(next) {
     const wasActive = active;
@@ -159,7 +183,7 @@
     } else {
       discover(root);
       for (const record of records.values()) {
-        if (!wasActive || classifierChanged || record.status === "uncertain" && record.settingsError) reset(record);
+        if (!wasActive || classifierChanged || record.settingsError) reset(record);
         else { applyRecord(record); enqueue(record); }
       }
     }
@@ -189,13 +213,17 @@
     record.source = sourceOf(record.media);
     record.status = "pending";
     record.analysisComplete = false;
+    record.contentDigest = null;
+    record.remembered = false;
+    record.permissionBusy = false;
+    record.controlError = "";
     record.reason = "로컬 AI로 확인 중입니다.";
     record.revealed = false;
     record.userHidden = false;
     record.settingsError = settingsError;
     if (!active) return;
     if (settingsError) {
-      record.status = "uncertain";
+      record.status = "error";
       record.reason = "설정을 읽지 못해 가렸습니다.";
     }
     applyRecord(record);
@@ -228,33 +256,38 @@
         const generation = record.generation;
         const taskEpoch = epoch;
         const source = record.source;
-        const cacheKey = `${settings.imageSafetySexual}:${settings.imageSafetySensitivity}:${source}`;
         let result;
         if (record.media.tagName !== "IMG") {
-          result = { status: "uncertain", reason: "영상·외부 콘텐츠는 자동 검사하지 않아 가렸습니다." };
+          result = { status: "unsupported", reason: "영상·외부 콘텐츠는 자동 검사하지 않습니다." };
         } else if (!source || /\.(?:gif|svg)(?:[?#]|$)/i.test(source)) {
-          result = { status: "uncertain", reason: "움짤·벡터 이미지 또는 출처를 확인할 수 없어 가렸습니다." };
+          result = { status: "unsupported", reason: "움짤·벡터 이미지 또는 출처가 없는 이미지는 자동 검사하지 않습니다." };
         } else {
           try {
-            result = cache.get(cacheKey) || await classify(source);
-            if (taskEpoch === epoch && !cache.has(cacheKey)) {
-              if (cache.size >= 180) cache.delete(cache.keys().next().value);
-              cache.set(cacheKey, result);
-            }
+            result = await classify(source);
           } catch (_error) {
-            result = { status: "uncertain", reason: "검사에 실패해 가렸습니다. 직접 볼 수 있습니다." };
+            result = { status: "error", reason: "검사를 완료하지 못했습니다. 다시 검사하거나 직접 볼 수 있습니다." };
           }
         }
         if (!active || taskEpoch !== epoch || records.get(record.media) !== record || generation !== record.generation || source !== sourceOf(record.media)) continue;
+        if (result?.status === "allowed") {
+          // Revocation may arrive while a previously allowed response is in flight.
+          let stillAllowed = false;
+          try { stillAllowed = allowlist.validDigest(result.contentDigest) && await allowlist.has(result.contentDigest); } catch (_error) {}
+          if (!active || taskEpoch !== epoch || generation !== record.generation || source !== sourceOf(record.media)) continue;
+          if (!stillAllowed) { reset(record); continue; }
+        }
         settle(record, result);
       }
     } finally { running = false; }
   }
 
   function settle(record, result) {
-    const status = result && ["safe", "blocked", "uncertain"].includes(result.status) ? result.status : "uncertain";
+    const status = result && ["safe", "blocked", "uncertain", "allowed", "error", "unsupported"].includes(result.status) &&
+      (result.status !== "allowed" || allowlist.validDigest(result.contentDigest)) ? result.status : "error";
     record.status = status;
-    record.analysisComplete = result?.status === status && result?.analysisComplete === true;
+    record.analysisComplete = ["safe", "blocked", "uncertain"].includes(status) && result?.analysisComplete === true;
+    record.contentDigest = ["safe", "blocked", "uncertain", "allowed"].includes(status) && allowlist.validDigest(result?.contentDigest) ? result.contentDigest : null;
+    record.remembered = status === "allowed";
     record.reason = typeof result?.reason === "string" ? result.reason.slice(0, 160) : "판단하지 못해 가렸습니다.";
     applyRecord(record);
   }
@@ -264,13 +297,13 @@
     const shown = record.revealed || automaticallyShown(record) && !record.userHidden;
     record.media.dataset.dcfSafetyState = shown ? "visible" : "covered";
     if (!shown && record.media.tagName === "VIDEO") record.media.pause();
-    if (shown && !record.revealed) removeOverlay(record);
+    if (shown && !record.revealed && !record.remembered) removeOverlay(record);
     else updateOverlay(record);
     scheduleLayout();
   }
 
   function automaticallyShown(record) {
-    return record.status === "safe" ||
+    return record.remembered || record.status === "safe" ||
       record.media.tagName === "IMG" && record.status === "uncertain" &&
       record.analysisComplete && !settings.imageSafetyHideUncertain;
   }
@@ -287,12 +320,13 @@
       document.body.appendChild(node);
     }
     const node = record.overlay;
+    const shown = record.revealed || automaticallyShown(record) && !record.userHidden;
     node.classList.toggle("dcf-safety-preview", preview);
-    node.classList.toggle("dcf-safety-revealed", record.revealed);
+    node.classList.toggle("dcf-safety-revealed", shown);
     node.replaceChildren();
-    if (!record.revealed) {
+    if (!shown) {
       const label = document.createElement("strong");
-      label.textContent = record.userHidden ? "이미지 가림" : record.status === "pending" ? "이미지 검사 중" : record.status === "blocked" ? "유해 이미지 의심 · 가림" : "확인할 수 없어 가림";
+      label.textContent = record.userHidden ? "이미지 가림" : record.status === "pending" ? "이미지 검사 중" : record.status === "blocked" ? "유해 이미지 의심 · 가림" : record.status === "error" ? "검사 실패 · 가림" : record.status === "unsupported" ? "자동 검사 미지원 · 가림" : "판단이 어려워 가림";
       const detail = document.createElement("small");
       detail.textContent = record.status === "pending" ? "처음 검사할 때 잠시 걸릴 수 있습니다." : record.reason;
       node.append(label, detail);
@@ -304,15 +338,65 @@
     } else {
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = record.revealed ? "다시 가리기" : "이번만 보기";
+      button.textContent = shown ? "다시 가리기" : "이번만 보기";
       button.addEventListener("click", (event) => {
         event.preventDefault(); event.stopPropagation();
-        record.revealed = !record.revealed;
+        record.revealed = !shown;
         record.userHidden = !record.revealed;
         applyRecord(record);
         record.overlay?.querySelector("button")?.focus({ preventScroll: true });
       });
       node.append(button);
+      if (record.status === "error" && !record.revealed) {
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.textContent = "다시 검사";
+        retry.addEventListener("click", (event) => {
+          event.preventDefault(); event.stopPropagation();
+          if (record.settingsError) reloadSettings();
+          else reset(record);
+        });
+        node.append(retry);
+      }
+      if (record.contentDigest && (shown || record.remembered)) {
+        const remember = document.createElement("button");
+        remember.type = "button";
+        remember.textContent = record.permissionBusy ? "저장 중…" : record.remembered ? "항상 보기 취소" : "이 이미지는 항상 보기";
+        remember.disabled = record.permissionBusy;
+        remember.addEventListener("click", (event) => {
+          event.preventDefault(); event.stopPropagation();
+          changePermission(record);
+        });
+        node.append(remember);
+      }
+      if (record.controlError) {
+        const detail = document.createElement("small");
+        detail.className = "dcf-safety-control-error";
+        detail.setAttribute("role", "status");
+        detail.textContent = record.controlError;
+        node.append(detail);
+      }
+    }
+  }
+
+  async function changePermission(record) {
+    if (record.permissionBusy || !record.contentDigest) return;
+    const digest = record.contentDigest, generation = record.generation;
+    const removing = record.remembered;
+    record.permissionBusy = true;
+    record.controlError = "";
+    updateOverlay(record);
+    try {
+      if (removing) await allowlist.remove(digest);
+      else if (!await allowlist.add(digest)) throw new Error("저장 한도를 넘었습니다.");
+      if (generation !== record.generation || digest !== record.contentDigest) return;
+      if (removing) reset(record);
+      else { record.remembered = true; record.permissionBusy = false; applyRecord(record); }
+    } catch (_error) {
+      if (generation !== record.generation) return;
+      record.permissionBusy = false;
+      record.controlError = "저장하지 못했습니다. 잠시 뒤 다시 시도해 주세요.";
+      applyRecord(record);
     }
   }
 
@@ -343,7 +427,7 @@
     layoutFrame = 0;
     if (!active) return;
     for (const record of records.values()) {
-      if (!record.overlay && (!automaticallyShown(record) || record.revealed || record.userHidden)) updateOverlay(record);
+      if (!record.overlay && (!automaticallyShown(record) || record.revealed || record.remembered || record.userHidden)) updateOverlay(record);
       const node = record.overlay;
       if (!node) continue;
       const box = record.media.getBoundingClientRect();
@@ -407,7 +491,7 @@
     const request = pending;
     pending = null;
     clearTimeout(request.timeout);
-    if (message.ok) request.resolve(message.result);
+    if (message.ok || ["error", "unsupported"].includes(message.result?.status)) request.resolve(message.result);
     else request.reject(new Error("로컬 검사 실패"));
   }
   function stopWorker() {

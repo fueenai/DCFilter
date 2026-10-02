@@ -103,6 +103,7 @@
     watchSiteNightMode();
     startInkWatchdog();
 
+    let settingsRevision = 0;
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName === "local" && changes[IMAGE_BLOCK_STORAGE_KEY]) {
         state.blockedImageFingerprints = normalizeBlockedImageFingerprints(changes[IMAGE_BLOCK_STORAGE_KEY].newValue);
@@ -111,13 +112,13 @@
         if (state.enabled) syncSignatureImageBlocker();
         return;
       }
-      if (areaName !== "sync") return;
-      const next = Object.assign({}, state.settings);
-      Object.entries(changes).forEach(([key, change]) => {
-        next[key] = change.newValue;
-      });
-      state.settings = storage.normalizeSettings(next);
-      applySettings();
+      if (areaName !== "sync" || !storage.isSettingsChange(changes)) return;
+      const revision = ++settingsRevision;
+      storage.loadSettings().then(next => {
+        if (revision !== settingsRevision) return;
+        state.settings = next;
+        applySettings();
+      }).catch(error => console.warn("[DCFilter] 설정을 다시 읽지 못했습니다.", error));
     });
   }
 

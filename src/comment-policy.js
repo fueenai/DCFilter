@@ -74,11 +74,29 @@
     return null;
   }
 
+  function matchesExact(text, list) {
+    // Compare the entire sentence. A longer comment must never inherit an
+    // exception from its truncated prefix or from the unquoted portion alone.
+    if (typeof text !== "string" || text.length > MAX_TEMPLATE_LENGTH || !Array.isArray(list)) return false;
+    const normalized = normalizeText(text);
+    return Boolean(normalized && list.slice(0, MAX_TEMPLATES).some((item) =>
+      typeof item === "string" && item.length <= MAX_TEMPLATE_LENGTH && normalizeText(item) === normalized
+    ));
+  }
+
   function analyze(text, options = {}) {
     options = options && typeof options === "object" ? options : {};
     const cleaned = cleanText(text);
     const normalized = normalizeText(cleaned);
     const result = { hide: false, score: 0, reasons: [], normalized };
+    const fullText = typeof options.fullText === "string" ? options.fullText : text;
+    if (matchesExact(fullText, options.allowlist)) return { ...result, allowed: true };
+    // A deliberately registered complete sentence is explicit user intent,
+    // including a quotation or an AI discussion. Similarity rules below retain
+    // their quotation/discussion safeguards.
+    if (compactText(fullText).length >= 8 && matchesExact(fullText, options.templates)) {
+      return { ...result, hide: true, score: 10, reasons: ["등록한 봇 댓글 예시와 문장 전체가 일치"] };
+    }
     if (!normalized || isDiscussion(cleaned)) return result;
     const body = unquotedText(cleaned).replace(/\s+/g, " ").trim();
     if (!body) return result;
@@ -144,12 +162,12 @@
       return { entry, group };
     });
     return entries.map(({ entry, group }) => {
-      const result = analyze(entry.text, { ...options, duplicateCount: group.count, distinctAuthors: group.authors.size });
-      return { id: entry.id, blocked: result.hide, score: result.score, reasons: result.reasons };
+      const result = analyze(entry.text, { ...options, fullText: entry.fullText ?? entry.text, duplicateCount: group.count, distinctAuthors: group.authors.size });
+      return { id: entry.id, blocked: result.hide, allowed: Boolean(result.allowed), score: result.score, reasons: result.reasons };
     });
   }
 
-  const api = Object.freeze({ analyze, analyzeComments, normalizeText, compactText, MAX_TEXT_LENGTH });
+  const api = Object.freeze({ analyze, analyzeComments, normalizeText, compactText, matchesExact, MAX_TEXT_LENGTH, MAX_TEMPLATE_LENGTH });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root) {
     root.DCFBotPolicy = api;
