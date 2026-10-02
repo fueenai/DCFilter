@@ -1,0 +1,84 @@
+{
+  "manifest_version": 3,
+  "name": "DCFilter",
+  "version": "0.6.3",
+  "description": "디시인사이드 봇 의심 댓글 접기, 로컬 AI 이미지 사전 차단, UI 정리, 읽음 표시, 자짤 차단 및 작성자 분석.",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://*.dcinside.com https://*.dcinside.co.kr"
+  },
+  "action": {
+    "default_title": "DCFilter 설정",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": [
+    "storage",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "host_permissions": [
+    "https://gall.dcinside.com/*",
+    "https://*.dcinside.com/*",
+    "https://*.dcinside.co.kr/*"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "dcf_image_referrer",
+        "enabled": true,
+        "path": "src/rules.json"
+      }
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gall.dcinside.com/*"
+      ],
+      "js": [
+        "src/storage.js",
+        "src/early.js",
+        "src/safety-guard.js"
+      ],
+      "css": [
+        "src/content.css",
+        "src/safety.css",
+        "src/bot-comments.css"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://gall.dcinside.com/*"
+      ],
+      "js": [
+        "src/reading-state.js",
+        "src/reading.js",
+        "src/content.js",
+        "src/comment-policy.js",
+        "src/bot-comments.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/image-worker.html",
+        "src/image-worker.js",
+        "src/safety-worker.html"
+      ],
+      "matches": [
+        "https://gall.dcinside.com/*"
+      ]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

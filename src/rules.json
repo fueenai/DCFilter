@@ -1,0 +1,36 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "referer",
+          "operation": "set",
+          "value": "https://gall.dcinside.com/"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||dcinside.co.kr/viewimage.php"
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "referer",
+          "operation": "set",
+          "value": "https://gall.dcinside.com/"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||image.dcinside.com/download.php"
+    }
+  }
+]

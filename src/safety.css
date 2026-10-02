@@ -1,0 +1,73 @@
+/* Unknown media stays opaque from document_start through settings/model load.
+   Keep this selector aligned with safety-guard.js. Do not use blur: it leaks
+   silhouettes and does not cover a source that changes after being approved. */
+html:is(:not(.dcf-safety-ready), .dcf-safety-on) :is(
+  .write_div :is(img, video, iframe, object, embed, svg),
+  .writing_view_box :is(img, video, iframe, object, embed, svg),
+  .view_content :is(img, video, iframe, object, embed, svg),
+  .appending_cap_box :is(img, video),
+  .comment_dccon img,
+  .comment_wrap .usertxt img,
+  .comment_wrap .comment_txt :is(img, video, iframe),
+  .gall_list .gall_tit img,
+  .gall_list .thumb img,
+  .dcf-image-preview img
+):not([data-dcf-safety-state="visible"]) {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.dcf-safety-cover {
+  position: fixed !important;
+  z-index: 2147483001;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid #d0d4dc;
+  border-radius: 4px;
+  background: #eef0f4 !important;
+  color: #29313f !important;
+  font: 13px/1.45 "Malgun Gothic", sans-serif !important;
+  text-align: center;
+  pointer-events: auto !important;
+  isolation: isolate;
+}
+.dcf-safety-cover[hidden] { display: none !important; }
+.dcf-safety-cover strong { font: 600 13px/1.45 "Malgun Gothic", sans-serif !important; color: inherit !important; }
+.dcf-safety-cover small { max-width: 100%; font: 12px/1.45 "Malgun Gothic", sans-serif !important; color: inherit !important; overflow-wrap: anywhere; }
+.dcf-safety-cover button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  margin: 0;
+  padding: 5px 12px;
+  border: 1px solid #8994a5;
+  border-radius: 4px;
+  background: #fff;
+  color: #263244;
+  font: 600 12px/1.4 "Malgun Gothic", sans-serif;
+  cursor: pointer;
+}
+.dcf-safety-cover button:focus-visible { outline: 3px solid #547ae0; outline-offset: 2px; }
+.dcf-safety-cover.dcf-safety-preview { z-index: 2147483647; pointer-events: none !important; }
+.dcf-safety-cover.dcf-safety-revealed {
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 5px;
+  border: 0;
+  background: transparent !important;
+  pointer-events: none !important;
+}
+.dcf-safety-revealed button { pointer-events: auto !important; }
+.dcf-safety-small { padding: 3px; gap: 3px; }
+.dcf-safety-small small { display: none; }
+.dcf-safety-small strong { font-size: 11px !important; }
+.dcf-safety-small button { min-height: 24px; padding: 2px 5px; font-size: 11px; }
+html.dcf-dark .dcf-safety-cover { border-color: #465266; background: #263142 !important; color: #e5eaf2 !important; }
+html.dcf-dark .dcf-safety-revealed { background: transparent !important; }
+html.dcf-dark .dcf-safety-cover button { border-color: #6e7d95; background: #344359; color: #fff; }

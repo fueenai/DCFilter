@@ -1,0 +1,35 @@
+# Publish only the extension and the tools needed to verify/package it.
+/*
+!/.gitignore
+!/.gitattributes
+!/LICENSE
+!/README.md
+!/THIRD-PARTY-NOTICES.md
+!/manifest.json
+!/icons/
+!/popup/
+!/src/
+!/models/
+!/vendor/
+!/scripts/
+!/tests/
+
+/scripts/*
+!/scripts/check.cjs
+!/scripts/package.ps1
+!/scripts/prepare-safety-model.py
+/tests/*
+!/tests/*.test.cjs
+
+# Keep credentials, caches, experiments and working files out of Git.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.pfx
+**/*.p12
+**/__pycache__/
+**/node_modules/
+**/*.log
+**/.DS_Store
+**/Thumbs.db

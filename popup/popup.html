@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DCFilter 설정</title>
+  <script src="boot.js"></script>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="popup-shell">
+    <div class="sticky-top">
+      <header class="header">
+        <div class="brand">
+          <div class="brand-line">
+            <img src="../icons/icon48.png" width="18" height="18" alt="">
+            <h1>DCFilter</h1>
+            <span id="version" class="version"></span>
+          </div>
+          <p class="product-status">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="enabledStatus">갤러리에 적용 중</span>
+          </p>
+        </div>
+        <label class="toggle master-toggle" title="DCFilter 사용">
+          <input id="enabled" type="checkbox" aria-label="DCFilter 사용">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </label>
+      </header>
+
+      <div class="search-field">
+        <label for="settingsSearch">설정 찾기</label>
+        <input id="settingsSearch" type="search" placeholder="예: 읽음, 혐짤, 다크" autocomplete="off">
+        <button id="clearSearch" type="button" aria-label="검색 지우기" hidden>×</button>
+      </div>
+
+      <nav class="section-nav" aria-label="설정 분류">
+        <button type="button" data-target="settings-list">목록</button>
+        <button type="button" data-target="settings-cleanup">정리</button>
+        <button type="button" data-target="settings-preview">이미지</button>
+        <button type="button" data-target="settings-appearance">화면</button>
+        <button type="button" data-target="settings-author">분석</button>
+        <button type="button" data-target="settings-blocking">차단</button>
+        <button type="button" data-target="settings-data">관리</button>
+      </nav>
+    </div>
+
+    <p id="searchStatus" class="search-status" role="status" hidden></p>
+
+    <section id="settings-list" class="section">
+      <header class="section-header">
+        <h2>게시글 목록</h2>
+        <p>목록을 읽고 이동하는 기본 동작</p>
+      </header>
+
+      <label class="setting-row toggle-row">
+        <span class="setting-copy">
+          <strong>목록 자동 갱신</strong>
+          <small>상단에서 새 글을 확인합니다. 스크롤·입력 중에는 쉽니다.</small>
+        </span>
+        <span class="toggle">
+          <input id="autoRefresh" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row value-row" data-depends-on="autoRefresh">
+        <span class="setting-copy"><strong>갱신 간격</strong></span>
+        <span class="unit-control">
+          <input id="refreshInterval" type="number" min="3" max="60" inputmode="numeric">
+          <span>초</span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>새 탭에서 열기</strong></span>
+        <span class="toggle">
+          <input id="openInNewTab" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy">
+          <strong>읽은 글 표시</strong>
+          <small>직접 열어 본 글만 표시하며 시크릿 창은 기록하지 않습니다.</small>
+        </span>
+        <span class="toggle">
+          <input id="showReadPosts" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row" data-depends-on="showReadPosts">
+        <span class="setting-copy">
+          <strong>댓글 증가분 표시</strong>
+          <small>지난 열람 대비 늘어난 댓글을 +숫자로 표시합니다.</small>
+        </span>
+        <span class="toggle">
+          <input id="showCommentDelta" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy">
+          <strong>목록 위치 복원</strong>
+          <small>뒤로 오면 보던 위치로 돌아가고 읽은 행을 강조합니다.</small>
+        </span>
+        <span class="toggle">
+          <input id="restoreListPosition" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <div class="setting-row action-row">
+        <span class="setting-copy">
+          <strong>읽음 기록</strong>
+          <small id="readHistoryCount" aria-live="polite">로컬 기록 확인 중</small>
+        </span>
+        <button id="clearReadHistory" type="button" class="inline-action" disabled>기록 비우기</button>
+      </div>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>작성 시간 전체 표시</strong></span>
+        <span class="toggle">
+          <input id="showFullTime" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy">
+          <strong>닉네임 ID 표시</strong>
+          <small>고정닉·반고정닉의 식별자를 함께 표시합니다.</small>
+        </span>
+        <span class="toggle">
+          <input id="showNonFixedId" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy">
+          <strong>키보드 탐색</strong>
+          <small>J/K로 이동하고 Enter로 열거나 접습니다.</small>
+        </span>
+        <span class="toggle">
+          <input id="keyboardNavigation" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>디시 자체 차단글 숨기기</strong></span>
+        <span class="toggle">
+          <input id="hideDcBlockedPosts" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+    </section>
+
+    <section id="settings-cleanup" class="section">
+      <header class="section-header">
+        <h2>추천 영역 정리</h2>
+        <p>자동 노출 영역만 걷어내고 개념글 탭은 유지합니다</p>
+      </header>
+
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>실시간 베스트 숨김</strong></span>
+        <span class="toggle">
+          <input id="hideRealtimeBest" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>디시미디어·디시이슈 숨김</strong></span>
+        <span class="toggle">
+          <input id="hideDcMedia" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>추천 개념글 박스 숨김</strong></span>
+        <span class="toggle">
+          <input id="hideConceptPanels" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>목록의 이슈 행 숨김</strong></span>
+        <span class="toggle">
+          <input id="hideIssueRows" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy">
+          <strong>상단 신규갤·통계 숨김</strong>
+          <small>목록 위 홍보 블록을 숨깁니다.</small>
+        </span>
+        <span class="toggle">
+          <input id="hideGnbPromo" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy">
+          <strong>우측 추천 영역 정리</strong>
+          <small>로그인·사용자 패널은 제자리에 남깁니다.</small>
+        </span>
+        <span class="toggle">
+          <input id="expandCleanLayout" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+    </section>
+
+    <section id="settings-preview" class="section">
+      <header class="section-header">
+        <h2>이미지 보호·미리보기</h2>
+        <p>이미지를 먼저 검사하고, 표시할 사진을 고릅니다</p>
+      </header>
+
+      <label class="setting-row toggle-row">
+        <span class="setting-copy">
+          <strong>혐짤 AI 사전 차단 <span class="safety-beta">실험적</span></strong>
+          <small>혐오·잔혹 이미지를 PC에서 검사합니다. 검사 중·실패·미지원 항목과 유해 의심 이미지를 가립니다.</small>
+        </span>
+        <span class="toggle">
+          <input id="imageSafety" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row" data-depends-on="imageSafety">
+        <span class="setting-copy"><strong>성적 이미지도 차단</strong><small>노출·음란 이미지도 함께 검사합니다.</small></span>
+        <span class="toggle">
+          <input id="imageSafetySexual" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row" data-depends-on="imageSafety">
+        <span class="setting-copy">
+          <strong>판별이 애매한 이미지도 가리기</strong>
+          <small>기본은 검사를 마친 뒤 판별이 애매하면 표시합니다. 켜면 이런 이미지도 가립니다.</small>
+        </span>
+        <span class="toggle">
+          <input id="imageSafetyHideUncertain" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row value-row" data-depends-on="imageSafety">
+        <span class="setting-copy"><strong>판별 기준</strong></span>
+        <select id="imageSafetySensitivity">
+          <option value="strict">엄격하게 가리기</option>
+          <option value="balanced">보통</option>
+        </select>
+      </label>
+      <p class="safety-note">이미지 외부 전송·API 요금 없이 동작합니다. 모델이 포함되어 첫 검사에는 시간이 걸립니다. AI가 놓치거나 정상 사진을 가릴 수 있습니다. 검사에 실패했거나 GIF·영상 등 자동 검사를 지원하지 않는 항목은 위 옵션과 관계없이 계속 가립니다. 본문에서 ‘이번만 보기’로 열 수 있습니다.</p>
+
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>제목에 마우스 올리면 미리보기</strong></span>
+        <span class="toggle">
+          <input id="imagePreview" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row value-row" data-depends-on="imagePreview">
+        <span class="setting-copy"><strong>호버 대기</strong></span>
+        <span class="unit-control">
+          <input id="previewDelay" type="number" min="150" max="1500" step="50" inputmode="numeric">
+          <span>ms</span>
+        </span>
+      </label>
+      <label class="setting-row value-row" data-depends-on="imagePreview">
+        <span class="setting-copy"><strong>최대 이미지</strong></span>
+        <span class="unit-control">
+          <input id="previewMaxImages" type="number" min="1" max="4" inputmode="numeric">
+          <span>장</span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy">
+          <strong>자짤 이미지 차단</strong>
+          <small>디시 자동 자짤은 즉시 숨기고 나머지는 이미지 지문으로 등록합니다.</small>
+        </span>
+        <span class="toggle">
+          <input id="signatureImageBlock" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <div class="setting-row action-row">
+        <span class="setting-copy">
+          <strong>저장된 자짤</strong>
+          <small id="blockedImageCount" aria-live="polite">0개</small>
+        </span>
+        <button id="clearBlockedImages" class="inline-action" type="button" disabled>모두 해제</button>
+      </div>
+    </section>
+
+    <section id="settings-appearance" class="section">
+      <header class="section-header">
+        <h2>화면</h2>
+        <p>목록과 본문에 같은 팔레트와 글자 체계를 씁니다</p>
+      </header>
+
+      <fieldset class="theme-field">
+        <legend>테마</legend>
+        <div class="theme-chips">
+          <label>
+            <input type="radio" name="themeMode" value="light">
+            <span>라이트</span>
+          </label>
+          <label>
+            <input type="radio" name="themeMode" value="dark">
+            <span>다크</span>
+          </label>
+          <label>
+            <input type="radio" name="themeMode" value="auto">
+            <span>시간대</span>
+          </label>
+          <label>
+            <input type="radio" name="themeMode" value="system">
+            <span>시스템</span>
+          </label>
+        </div>
+        <p class="field-hint">시간대 자동은 19시–7시에 다크입니다. 디시 야간모드가 켜져 있으면 다크로 표시합니다.</p>
+      </fieldset>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>컴팩트 목록</strong></span>
+        <span class="toggle">
+          <input id="compactMode" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>이미지 숨기기</strong></span>
+        <span class="toggle">
+          <input id="hideImages" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>광고 숨기기</strong></span>
+        <span class="toggle">
+          <input id="hideAds" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row value-row">
+        <span class="setting-copy"><strong>강조 색상</strong></span>
+        <span class="color-control">
+          <input id="accentColor" type="color" aria-label="강조 색상">
+          <span id="accentValue">#3B4890</span>
+        </span>
+      </label>
+      <label class="setting-row value-row">
+        <span class="setting-copy"><strong>글꼴</strong></span>
+        <select id="fontFamily"></select>
+      </label>
+      <label class="setting-row range-row">
+        <span class="setting-copy"><strong>글자 크기</strong></span>
+        <span class="range-control">
+          <input id="fontScale" type="range" min="0.85" max="1.25" step="0.01">
+          <output id="fontScaleValue" for="fontScale">100%</output>
+        </span>
+      </label>
+    </section>
+
+    <section id="settings-author" class="section">
+      <header class="section-header">
+        <h2>작성자 분석</h2>
+        <p>최근 글과 댓글÷좋아요 반응을 모읍니다</p>
+      </header>
+
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>본문 분석 버튼</strong></span>
+        <span class="toggle">
+          <input id="showAuthorButton" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>좋대댓 배지</strong></span>
+        <span class="toggle">
+          <input id="showRatioBadge" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row value-row">
+        <span class="setting-copy"><strong>검색 페이지</strong></span>
+        <span class="unit-control">
+          <input id="authorPages" type="number" min="1" max="5" inputmode="numeric">
+          <span>쪽</span>
+        </span>
+      </label>
+      <label class="setting-row value-row">
+        <span class="setting-copy"><strong>팝업 너비</strong></span>
+        <span class="unit-control wide-unit">
+          <input id="popupWidth" type="number" min="480" max="960" step="10" inputmode="numeric">
+          <span>px</span>
+        </span>
+      </label>
+      <label class="setting-row value-row">
+        <span class="setting-copy"><strong>최대 게시글</strong></span>
+        <span class="unit-control">
+          <input id="popupMaxItems" type="number" min="10" max="100" inputmode="numeric">
+          <span>개</span>
+        </span>
+      </label>
+    </section>
+
+    <section id="settings-blocking" class="section section-last">
+      <header class="section-header">
+        <h2>IP 정보 · 차단</h2>
+        <p>게시글 차단과 봇 의심 댓글 접기를 설정합니다</p>
+      </header>
+
+      <label class="setting-row toggle-row">
+        <span class="setting-copy">
+          <strong>AI 봇 의심 댓글 접기</strong>
+          <small>등록한 예시와 비슷한 댓글, 여러 특징이 겹치는 정형적인 댓글을 접습니다.</small>
+        </span>
+        <span class="toggle">
+          <input id="botCommentFilter" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row value-row" data-depends-on="botCommentFilter">
+        <span class="setting-copy"><strong>봇 댓글 판별 기준</strong></span>
+        <select id="botCommentSensitivity">
+          <option value="balanced">뚜렷한 패턴만</option>
+          <option value="strict">더 넓게 접기</option>
+        </select>
+      </label>
+      <label class="text-field" data-depends-on="botCommentFilter">
+        <span class="field-heading"><strong>거르고 싶은 봇 댓글 예시</strong><small>댓글 하나를 한 줄에</small></span>
+        <textarea id="botCommentExamples" rows="5" aria-describedby="botCommentHint" placeholder="반복해서 보이는 댓글 문장을 입력하세요"></textarea>
+      </label>
+      <p id="botCommentHint" class="field-hint">예시 문장 전체와 거의 같은 댓글을 접습니다. 단어 하나만으로 주제를 차단하지 않습니다. AI 작성 여부를 확정하는 기능은 아니며, 접힌 댓글에서 이유를 확인하고 원문을 펼칠 수 있습니다. 외부 서버 전송·추가 모델 다운로드 없이 처리합니다.</p>
+
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>IP 대역 색상·정보 표시</strong></span>
+        <span class="toggle">
+          <input id="showIpInfo" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="setting-row toggle-row">
+        <span class="setting-copy"><strong>통신사 IP 게시글 차단</strong></span>
+        <span class="toggle">
+          <input id="blockCarrierIp" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="text-field">
+        <span class="field-heading">
+          <strong>키워드 차단</strong>
+          <small>한 줄에 하나씩</small>
+        </span>
+        <textarea id="blockKeywords" rows="4" placeholder="예: 스포일러"></textarea>
+      </label>
+      <label class="text-field">
+        <span class="field-heading">
+          <strong>사용자 차단</strong>
+          <small>한 줄에 하나씩</small>
+        </span>
+        <textarea id="blockUsers" rows="4" placeholder="닉네임, ID 또는 표시된 IP를 한 줄에 하나씩"></textarea>
+      </label>
+    </section>
+
+    <section id="settings-data" class="section">
+      <header class="section-header">
+        <h2>설정 관리</h2>
+        <p>화면 설정과 차단 목록을 백업합니다</p>
+      </header>
+      <div class="data-actions">
+        <button id="exportSettings" type="button" class="utility-button">설정 내보내기</button>
+        <button id="importSettings" type="button" class="utility-button">설정 불러오기</button>
+        <input id="importFile" type="file" accept="application/json,.json" hidden>
+      </div>
+      <p class="field-hint">읽음 기록과 자짤 이미지 지문은 백업에 포함되지 않습니다. 불러온 설정은 확인 후 저장해야 적용됩니다.</p>
+      <div class="management-note"><strong>업데이트가 반영되지 않나요?</strong><p>확장 관리에서 DCFilter를 새로고침한 뒤 열린 디시 탭도 새로고침하세요.</p></div>
+      <button id="reset" type="button" class="utility-button danger-button">설정 기본값 복원</button>
+    </section>
+
+    <footer class="footer">
+      <div class="save-state" aria-live="polite">
+        <span class="save-dot" aria-hidden="true"></span>
+        <span id="saveStatus">모든 설정 저장됨</span>
+      </div>
+      <div class="footer-actions">
+        <button id="discard" type="button" class="secondary" disabled>되돌리기</button>
+        <button id="save" type="button" disabled>저장</button>
+      </div>
+    </footer>
+  </main>
+  <script src="../src/storage.js"></script>
+  <script src="../src/reading-state.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

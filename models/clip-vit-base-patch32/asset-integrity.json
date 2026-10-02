@@ -1,0 +1,61 @@
+{
+  "modelRevision": "d15189d7028b43f1d3e65039190477f6af591c2a",
+  "onnxruntimeVersion": "1.20.1",
+  "files": [
+    {
+      "path": "models/clip-vit-base-patch32/config.json",
+      "bytes": 4524,
+      "sha256": "493ef57ff783e42d1530c91b53469b7fdf8db8a9c1408e86998fcb7899a4f495"
+    },
+    {
+      "path": "models/clip-vit-base-patch32/LICENSE.txt",
+      "bytes": 1064,
+      "sha256": "987e63b32f6c89ff5160e429458a872ff048e6860b590a3912e938f9da8f14db"
+    },
+    {
+      "path": "models/clip-vit-base-patch32/preprocessor_config.json",
+      "bytes": 520,
+      "sha256": "6f638fb9401a6d6296feff533ee7efe657b787c49f954f82f5906b36ef2a1b1f"
+    },
+    {
+      "path": "models/clip-vit-base-patch32/README.md",
+      "bytes": 1404,
+      "sha256": "19c2ef35fa89966c7fa7aa30666b4e3aeef4b075461626be55e6037133cc6aa4"
+    },
+    {
+      "path": "models/clip-vit-base-patch32/safety-prompts.json",
+      "bytes": 263251,
+      "sha256": "c139f8571a6590cd0ec7d1380a43938d110c3f1e271365e3c9c2b4d319e873c5"
+    },
+    {
+      "path": "models/clip-vit-base-patch32/vision_model_quantized.onnx",
+      "bytes": 89117001,
+      "sha256": "583fd1110a514667812fee7d684952aaf82a99b959760c8d7dca7e0ab9839299"
+    },
+    {
+      "path": "vendor/onnxruntime-web/LICENSE",
+      "bytes": 1073,
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    {
+      "path": "vendor/onnxruntime-web/ort-wasm-simd-threaded.mjs",
+      "bytes": 24618,
+      "sha256": "745eb7c0ce6f18a6aa521971b2877babc7ffb27eecb58ab3bc6e5ef4692672e8"
+    },
+    {
+      "path": "vendor/onnxruntime-web/ort-wasm-simd-threaded.wasm",
+      "bytes": 11246032,
+      "sha256": "207d02be4591c156b0a98f024f3d58005b5b04c92274d759fb390338c63559ea"
+    },
+    {
+      "path": "vendor/onnxruntime-web/ort.wasm.min.js",
+      "bytes": 49026,
+      "sha256": "e66568724f8848e57cc2a56e4bea3a5b86ce3ff81b2da11eac8ed7ab02b27bd4"
+    },
+    {
+      "path": "vendor/onnxruntime-web/ThirdPartyNotices.txt",
+      "bytes": 338538,
+      "sha256": "cf7342f7ba482ef715ae58f5f497a8d3564fa255164175aea324cd293c5701a0"
+    }
+  ]
+}

@@ -1,0 +1,3756 @@
+/* ==========================================================================
+   DCFilter — gall.dcinside.com
+   --------------------------------------------------------------------------
+   Design direction: DC-native navy, quiet neutrals, post-first board.
+
+   Color rules
+     - One hue family. Neutrals carry a faint trace of DC navy (OKLCH hue 270,
+       chroma <= 0.016) so they sit with the site's own navy chrome instead of
+       fighting it.
+     - Every accent-derived color (links, fills, GNB, tints, rails) is computed
+       from the single user accent, so a custom accent never clashes with a
+       fixed link color. Default accent = DC's own #3b4890.
+     - Color marks exceptions only. Domestic IPs are neutral; mobile/overseas
+       IPs and the reading state are the only tinted labels.
+
+   The list is ONE enclosed board — a single hairline rectangle where rows are
+   separated by hairlines. No drop shadows on rows, no 12px card radii.
+
+   Layout of this file
+     01. Tokens
+     02. Base — page, typography, fonts, controls
+     03. Chrome — header, search, GNB, visit-history strip
+     04. List — page head, toolbar, board, rows, states, paging
+     05. Right rail — login / content boxes
+     06. Post view — header, body, recommend, comments, write box
+     07. Visibility toggles — dcf-hide-*
+     08. Extension UI — badges, FAB, toast, preview, panel, image blocker
+     09. Responsive, motion, forced colors
+   ========================================================================== */
+
+/* ==========================================================================
+   01. TOKENS
+   ========================================================================== */
+
+:root {
+  /* content.js overwrites this inline with the user's setting. */
+  --dcf-accent: #3b4890;
+  --dcf-font-scale: 1;
+  --dcf-font-family: inherit;
+
+  --dcf-bg: #f6f7fa;
+  --dcf-header: #ffffff;
+  --dcf-surface: #ffffff;
+  --dcf-surface-2: #f2f4f7;
+  --dcf-surface-3: #e6e8ed;
+  --dcf-input: #ffffff;
+  --dcf-text: #1c1f28;
+  --dcf-muted: #5f636f;
+  --dcf-subtle: #70747f;
+  --dcf-border: #e1e3e8;
+  --dcf-border-strong: #cccfd7;
+
+  /* Accent family, derived. `tone` feeds tints/rails/borders, `fill` sits
+     under white text, `link` is text on the page surface. Lightness is
+     clamped so any user color stays legible in its role. */
+  --dcf-tone: oklch(from var(--dcf-accent) min(l, 0.55) c h);
+  --dcf-accent-fill: oklch(from var(--dcf-accent) min(l, 0.55) c h);
+  --dcf-accent-fill-hover: oklch(from var(--dcf-accent) calc(min(l, 0.55) - 0.06) c h);
+  --dcf-on-accent: #ffffff;
+  --dcf-link: oklch(from var(--dcf-accent) min(l, 0.5) c h);
+  --dcf-nav: oklch(from var(--dcf-accent) min(l, 0.43) min(c, 0.12) h);
+  --dcf-nav-ink: #ffffff;
+  /* DC marks the current GNB section in yellow; kept, slightly softened. */
+  --dcf-nav-highlight: #ffe45e;
+
+  --dcf-danger: #b93a30;
+  --dcf-scrim: rgba(12, 15, 26, 0.46);
+  --dcf-media-bg: #0f1116;
+
+  /* One restrained elevation value, used by the panel and the image preview
+     only. Rows, the board, the toolbar and the post view carry no shadow. */
+  --dcf-shadow: 0 1px 2px rgba(16, 20, 36, 0.06), 0 10px 28px rgba(16, 20, 36, 0.1);
+
+  /* Data-label tints. Domestic is the common case, so it stays neutral. */
+  --dcf-ip-domestic-ink: #4f5461;
+  --dcf-ip-domestic-bg: #f2f4f7;
+  --dcf-ip-domestic-line: #e1e3e8;
+  --dcf-ip-mobile-ink: #2b5891;
+  --dcf-ip-mobile-bg: #edf3fb;
+  --dcf-ip-mobile-line: #cddbee;
+  --dcf-ip-overseas-ink: #a1332a;
+  --dcf-ip-overseas-bg: #fcefed;
+  --dcf-ip-overseas-line: #efccc7;
+}
+
+html.dcf-dark {
+  --dcf-bg: #111318;
+  --dcf-header: #14161c;
+  --dcf-surface: #17191f;
+  --dcf-surface-2: #1e2027;
+  --dcf-surface-3: #282b33;
+  --dcf-input: #13151a;
+  --dcf-text: #e6e8ec;
+  --dcf-muted: #aaaeb7;
+  --dcf-subtle: #8a8d96;
+  --dcf-border: #2b2e35;
+  --dcf-border-strong: #3f424b;
+
+  --dcf-tone: oklch(from var(--dcf-accent) clamp(0.64, l, 0.72) c h);
+  --dcf-accent-fill: oklch(from var(--dcf-accent) clamp(0.5, l, 0.56) c h);
+  --dcf-accent-fill-hover: oklch(from var(--dcf-accent) calc(clamp(0.5, l, 0.56) + 0.05) c h);
+  --dcf-link: oklch(from var(--dcf-accent) max(l, 0.8) min(c, 0.09) h);
+  --dcf-nav: oklch(from var(--dcf-accent) 0.29 min(c, 0.06) h);
+
+  --dcf-danger: #f0877d;
+  --dcf-scrim: rgba(0, 0, 0, 0.6);
+  --dcf-media-bg: #0b0c10;
+  --dcf-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 34px rgba(0, 0, 0, 0.45);
+
+  --dcf-ip-domestic-ink: #b3b7c0;
+  --dcf-ip-domestic-bg: #1e2027;
+  --dcf-ip-domestic-line: #2b2e35;
+  --dcf-ip-mobile-ink: #9fc2f0;
+  --dcf-ip-mobile-bg: #16202e;
+  --dcf-ip-mobile-line: #273d58;
+  --dcf-ip-overseas-ink: #f2a59d;
+  --dcf-ip-overseas-bg: #2a1a1a;
+  --dcf-ip-overseas-line: #4e2c29;
+}
+
+html.dcf-active {
+  color-scheme: light;
+  background: var(--dcf-bg) !important;
+}
+
+html.dcf-active.dcf-dark {
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   02. BASE
+   ========================================================================== */
+
+html.dcf-active body {
+  background: var(--dcf-bg) !important;
+  color: var(--dcf-text) !important;
+  font-size: calc(13px * var(--dcf-font-scale)) !important;
+  line-height: 1.5;
+}
+
+html.dcf-active body,
+html.dcf-active input,
+html.dcf-active select,
+html.dcf-active textarea,
+html.dcf-active button {
+  font-family: var(--dcf-font-family, inherit) !important;
+}
+
+html.dcf-active #top,
+html.dcf-active #container {
+  color: var(--dcf-text) !important;
+}
+
+/* Hairline default for every surface the site draws. Individual blocks below
+   override the ones that need to be flat or shadowless. */
+html.dcf-active .pop_wrap .pop_content,
+html.dcf-active .pop_wrap .inner,
+html.dcf-active .pop_wrap .pop_head {
+  border-color: var(--dcf-border) !important;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .dcheader {
+  border-color: var(--dcf-border) !important;
+  background: var(--dcf-header) !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .dcheader a,
+html.dcf-active .dcheader .area_links,
+html.dcf-active .dcheader .area_links a {
+  color: var(--dcf-muted) !important;
+}
+
+/* The site paints 로그인 navy; the muted ink above would sit on it
+   unreadably. Same fill as every other primary action. */
+html.dcf-active .dcheader .area_links a.btn_top_loginout {
+  border-color: var(--dcf-accent-fill) !important;
+  border-radius: 3px;
+  background: var(--dcf-accent-fill) !important;
+  color: var(--dcf-on-accent) !important;
+}
+
+/* "야간 모드를 이용해 보세요" nudge: the site ships it lime green, the one
+   saturated blob left in the header. Neutral tag instead. */
+html.dcf-active .darkmodebox .pop_tipbox .inner {
+  border: 1px solid var(--dcf-border-strong) !important;
+  border-radius: 3px !important;
+  background: var(--dcf-surface-2) !important;
+  box-shadow: none !important;
+}
+
+html.dcf-active .darkmodebox .pop_tipbox .inner,
+html.dcf-active .darkmodebox .pop_tipbox .inner * {
+  color: var(--dcf-muted) !important;
+}
+
+/* Its pointer is a CSS border triangle in the same lime. */
+html.dcf-active .darkmodebox .pop_tipbox::after {
+  border-bottom-color: var(--dcf-border-strong) !important;
+}
+
+html.dcf-dark .dc_logo .logo_img,
+html.dcf-dark .dc_logo .logo_img2 {
+  filter: brightness(0) invert(1) opacity(0.92);
+}
+
+/* Form controls: one hairline treatment, 3px radius, tabular numerals. */
+html.dcf-active input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+html.dcf-active select,
+html.dcf-active textarea,
+html.dcf-active .option_box,
+html.dcf-active .option_box li {
+  border-color: var(--dcf-border-strong) !important;
+  background: var(--dcf-input) !important;
+  color: var(--dcf-text) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+html.dcf-active input::placeholder,
+html.dcf-active textarea::placeholder {
+  color: var(--dcf-subtle) !important;
+}
+
+/* The site ships pill-shaped defaults on a lot of small links; flatten them
+   all so nothing wider than a tag radius survives. */
+html.dcf-active .btn_white,
+html.dcf-active .btn_grey,
+html.dcf-active .select_area,
+html.dcf-active .select_area a,
+html.dcf-active .list_bottom_btnbox button,
+html.dcf-active .array_tab button,
+html.dcf-active .page_head button {
+  border-radius: 3px !important;
+}
+
+html.dcf-active .dcfoot,
+html.dcf-active .dcfoot a {
+  border-color: var(--dcf-border) !important;
+  background: transparent !important;
+  color: var(--dcf-muted) !important;
+}
+
+/* ==========================================================================
+   03. CHROME — header, search, GNB, visit history
+   ========================================================================== */
+
+html.dcf-active .top_search {
+  overflow: hidden;
+  border: 1px solid var(--dcf-border-strong) !important;
+  border-radius: 4px;
+  background: var(--dcf-input) !important;
+  box-shadow: none;
+}
+
+html.dcf-active .top_search .inner_search,
+html.dcf-active .top_search .in_keyword {
+  background: var(--dcf-input) !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .top_search .in_keyword::placeholder {
+  color: var(--dcf-subtle) !important;
+}
+
+html.dcf-active .top_search .bnt_search {
+  border-radius: 0 !important;
+  background-color: var(--dcf-nav) !important;
+  color: #ffffff !important;
+}
+
+/* GNB: DC's navy bar — derived from the accent so a custom accent retints
+   the whole chrome instead of clashing with it. 44px, no gradient. */
+html.dcf-active .gnb_bar {
+  height: 44px !important;
+  background: var(--dcf-nav) !important;
+  background-image: none !important;
+  border-bottom: 0 !important;
+}
+
+/* The 2nd-level dropdown (.depth2) is a white site panel: keep its ink. */
+html.dcf-active .gnb_bar a:not(.depth2 a),
+html.dcf-active .gnb_bar button,
+html.dcf-active .gnb_bar span:not(.depth2 span),
+html.dcf-active .gnb_bar strong {
+  color: var(--dcf-nav-ink) !important;
+}
+
+/* Current section keeps DC's yellow marker; hover borrows it. */
+html.dcf-active .gnb_bar .gnb_list > li > a.on,
+html.dcf-active .gnb_bar .gnb_list > li > a:hover,
+html.dcf-active .gnb_bar button:hover {
+  color: var(--dcf-nav-highlight) !important;
+}
+
+/* ── Visit-history strip ──────────────────────────────────────────────────
+   #visit_history is a full-width wrapper, so keep it transparent and put the
+   border on the 1160px content element. overflow:hidden is forbidden here —
+   the dropdown layer has to escape the bar. */
+html.dcf-active #visit_history {
+  height: 44px !important;
+  margin: 10px auto 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--dcf-muted) !important;
+  box-shadow: none !important;
+}
+
+html.dcf-active #visit_history::before,
+html.dcf-active #visit_history::after,
+html.dcf-active #visit_history .newvisit_history::before,
+html.dcf-active #visit_history .newvisit_history::after,
+html.dcf-active #visit_history .newvisit_box::before,
+html.dcf-active #visit_history .newvisit_box::after {
+  content: none !important;
+}
+
+html.dcf-active #visit_history .newvisit_history {
+  box-sizing: border-box;
+  display: flex !important;
+  align-items: center;
+  gap: 4px;
+  height: 44px !important;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 4px !important;
+  padding: 0 10px 0 12px !important;
+  background-image: none !important;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-muted) !important;
+  box-shadow: none;
+}
+
+html.dcf-active #visit_history .tit,
+html.dcf-active #visit_history .tit a {
+  display: flex !important;
+  align-items: center;
+  width: auto !important;
+  height: auto !important;
+  float: none !important;
+  margin: 0 !important;
+  padding: 0 10px 0 0 !important;
+  color: var(--dcf-muted) !important;
+  font-size: 11px !important;
+  font-weight: 600;
+  line-height: 1 !important;
+  white-space: nowrap;
+}
+
+html.dcf-active #visit_history .tit[style*="display: none"],
+html.dcf-active #visit_history .tit[style*="display:none"],
+html.dcf-active #visit_history .newvisit_list[style*="display: none"],
+html.dcf-active #visit_history .newvisit_list[style*="display:none"] {
+  display: none !important;
+}
+
+html.dcf-active #visit_history .tit::before {
+  width: 3px;
+  height: 14px;
+  margin-right: 8px;
+  border-radius: 1px;
+  background: var(--dcf-tone);
+  content: "";
+}
+
+html.dcf-active #visit_history .btn_open,
+html.dcf-active #visit_history .bnt_visit_prev,
+html.dcf-active #visit_history .bnt_visit_next,
+html.dcf-active #visit_history .bnt_newvisit_more {
+  position: relative !important;
+  inset: auto !important;
+  display: grid !important;
+  place-items: center;
+  flex: 0 0 auto;
+  float: none !important;
+  margin: 0 !important;
+  border: 0 !important;
+  outline: 0;
+  background: transparent !important;
+  color: var(--dcf-muted) !important;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+html.dcf-active #visit_history .btn_open {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 3px;
+}
+
+html.dcf-active #visit_history .btn_open:hover,
+html.dcf-active #visit_history .bnt_visit_prev:hover,
+html.dcf-active #visit_history .bnt_visit_next:hover,
+html.dcf-active #visit_history .bnt_newvisit_more:hover {
+  background: color-mix(in srgb, var(--dcf-tone) 10%, transparent) !important;
+  color: var(--dcf-link) !important;
+}
+
+html.dcf-active #visit_history .btn_open .icon_listmore {
+  width: 7px !important;
+  height: 7px !important;
+  margin-top: -3px;
+  border: 0 !important;
+  border-right: 1.5px solid currentColor !important;
+  border-bottom: 1.5px solid currentColor !important;
+  background: none !important;
+  transform: rotate(45deg);
+  transition: transform 160ms ease, margin 160ms ease;
+}
+
+html.dcf-active #visit_history:has(#visit_history_lyr:not([style*="display: none"]):not([style*="display:none"])) .btn_open {
+  background: color-mix(in srgb, var(--dcf-tone) 12%, transparent) !important;
+  color: var(--dcf-link) !important;
+}
+
+html.dcf-active #visit_history:has(#visit_history_lyr:not([style*="display: none"]):not([style*="display:none"])) .btn_open .icon_listmore {
+  margin-top: 3px;
+  transform: rotate(225deg);
+}
+
+html.dcf-active #visit_history .bnt_visit_prev,
+html.dcf-active #visit_history .bnt_visit_next {
+  width: 24px !important;
+  height: 26px !important;
+  border-radius: 3px;
+}
+
+html.dcf-active #visit_history .bnt_visit_prev em,
+html.dcf-active #visit_history .bnt_visit_next em {
+  width: 7px !important;
+  height: 7px !important;
+  border: 0 !important;
+  border-bottom: 1.5px solid currentColor !important;
+  border-left: 1.5px solid currentColor !important;
+  background: none !important;
+}
+
+html.dcf-active #visit_history .bnt_visit_prev em { transform: rotate(45deg); }
+html.dcf-active #visit_history .bnt_visit_next em { transform: rotate(225deg); }
+
+html.dcf-active #visit_history .newvisit_box {
+  min-width: 0;
+  height: 42px !important;
+  flex: 1 1 auto;
+  overflow: hidden;
+  border: 0 !important;
+  background: var(--dcf-surface) !important;
+  /* Chips fade out at the right edge instead of being cut off. */
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 30px), transparent 100%);
+}
+
+html.dcf-active #visit_history .newvisit_list {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  width: max-content !important;
+  min-width: 100%;
+  height: 42px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: var(--dcf-surface) !important;
+}
+
+html.dcf-active #visit_history .newvisit_list li {
+  display: flex !important;
+  align-items: center;
+  width: auto !important;
+  height: 26px !important;
+  flex: 0 0 auto;
+  margin: 0 !important;
+  padding: 0 4px 0 9px !important;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 3px !important;
+  background: var(--dcf-surface-2) !important;
+  color: var(--dcf-text) !important;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+/* Other extensions (DIBE and friends) force square corners with !important;
+   repeating the class keeps our tag radius. */
+html.dcf-active.dcf-active.dcf-active #visit_history .newvisit_list li,
+html.dcf-active.dcf-active.dcf-active #visit_history_lyr .under_listbox li {
+  border-radius: 3px !important;
+}
+
+html.dcf-active #visit_history .newvisit_list li:first-child {
+  border-color: color-mix(in srgb, var(--dcf-tone) 22%, var(--dcf-border)) !important;
+  background: color-mix(in srgb, var(--dcf-tone) 7%, var(--dcf-surface)) !important;
+}
+
+html.dcf-active #visit_history .newvisit_list li:hover {
+  border-color: color-mix(in srgb, var(--dcf-tone) 34%, var(--dcf-border)) !important;
+  background: color-mix(in srgb, var(--dcf-tone) 9%, var(--dcf-surface)) !important;
+}
+
+html.dcf-active #visit_history .newvisit_list li > a {
+  display: block;
+  overflow: hidden;
+  max-width: 160px;
+  color: var(--dcf-text) !important;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.dcf-active #visit_history .btn_visit_del {
+  position: relative !important;
+  display: block !important;
+  width: 20px !important;
+  height: 20px !important;
+  flex: 0 0 auto;
+  margin-left: 3px !important;
+  border: 0 !important;
+  border-radius: 3px;
+  background: transparent !important;
+  color: var(--dcf-muted) !important;
+  opacity: 0;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+html.dcf-active #visit_history li:hover > .btn_visit_del,
+html.dcf-active #visit_history li:focus-within > .btn_visit_del {
+  opacity: 1;
+}
+
+html.dcf-active #visit_history .btn_visit_del:hover {
+  background: color-mix(in srgb, var(--dcf-danger) 12%, transparent) !important;
+  color: var(--dcf-link) !important;
+}
+
+html.dcf-active #visit_history .btn_visit_del .icon_visit_del {
+  display: none !important;
+}
+
+html.dcf-active #visit_history .btn_visit_del::before,
+html.dcf-active #visit_history .btn_visit_del::after {
+  position: absolute;
+  top: 9px;
+  left: 5px;
+  width: 10px;
+  height: 1px;
+  background: currentColor;
+  content: "";
+}
+
+html.dcf-active #visit_history .btn_visit_del::before { transform: rotate(45deg); }
+html.dcf-active #visit_history .btn_visit_del::after { transform: rotate(-45deg); }
+
+html.dcf-active #visit_history .bnt_newvisit_more {
+  width: auto !important;
+  height: 24px !important;
+  margin-left: 4px !important;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 3px !important;
+  padding: 0 9px !important;
+  background: var(--dcf-surface-2) !important;
+  color: var(--dcf-muted) !important;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none !important;
+  line-height: 1 !important;
+}
+
+html.dcf-active #visit_history .bnt_newvisit_more:hover {
+  border-color: color-mix(in srgb, var(--dcf-tone) 45%, var(--dcf-border)) !important;
+  color: var(--dcf-link) !important;
+}
+
+html.dcf-active #visit_history_lyr {
+  top: calc(100% + 8px) !important;
+  left: 0 !important;
+  z-index: 3000;
+  width: min(560px, calc(100vw - 32px)) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: 390px;
+  overflow: hidden;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 6px;
+  background: var(--dcf-surface) !important;
+  box-shadow: var(--dcf-shadow) !important;
+  transform-origin: top left;
+}
+
+html.dcf-active #visit_history_lyr:not([style*="display: none"]):not([style*="display:none"]) {
+  animation: dcf-visit-layer-in 150ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes dcf-visit-layer-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+html.dcf-active #visit_history_lyr .pop_content {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: var(--dcf-surface) !important;
+}
+
+html.dcf-active #visit_history_lyr .tabs {
+  width: 100% !important;
+  height: 44px !important;
+  border-bottom: 1px solid var(--dcf-border) !important;
+  background: var(--dcf-surface) !important;
+}
+
+html.dcf-active #visit_history_lyr .tabslist {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: 44px !important;
+  margin: 0 !important;
+  padding: 0 12px !important;
+}
+
+html.dcf-active #visit_history_lyr .tabslist::after { content: none !important; }
+
+html.dcf-active #visit_history_lyr .tabslist li {
+  position: relative;
+  width: auto !important;
+  height: 44px !important;
+  float: none !important;
+  background: transparent !important;
+}
+
+html.dcf-active #visit_history_lyr .tabslist button {
+  width: 100%;
+  height: 44px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 0 12px !important;
+  background: transparent !important;
+  color: var(--dcf-muted) !important;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+html.dcf-active #visit_history_lyr .tabslist li.on button {
+  color: var(--dcf-link) !important;
+}
+
+html.dcf-active #visit_history_lyr .tabslist li.on::after {
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  width: 44px;
+  height: 2px;
+  border-radius: 1px 1px 0 0;
+  background: var(--dcf-tone);
+  transform: translateX(-50%);
+  content: "";
+}
+
+/* Kill the site's own tab indicators so we do not draw a double underline. */
+html.dcf-active #visit_history_lyr .tabslist button::before,
+html.dcf-active #visit_history_lyr .tabslist button::after,
+html.dcf-active #visit_history_lyr .tabslist li::before {
+  content: none !important;
+}
+
+html.dcf-active #visit_history_lyr .tabslist li,
+html.dcf-active #visit_history_lyr .tabslist li.on {
+  border: 0 !important;
+}
+
+html.dcf-active #visit_history_lyr .tabslist button:hover {
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active #visit_history_lyr .toptab_content,
+html.dcf-active #visit_history_lyr .visit_div,
+html.dcf-active #visit_history_lyr .visit_tablist,
+html.dcf-active #visit_history_lyr .favorite_div {
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active #visit_history_lyr .under_listbox {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 6px;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  height: auto !important;
+  padding: 12px !important;
+}
+
+html.dcf-active #visit_history_lyr .under_listbox li {
+  display: flex !important;
+  align-items: center;
+  width: auto !important;
+  height: 26px !important;
+  margin: 0 !important;
+  padding: 0 4px 0 9px !important;
+  border: 1px solid var(--dcf-border) !important;
+  background: var(--dcf-surface-2) !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active #visit_history_lyr .under_listbox li:hover {
+  border-color: color-mix(in srgb, var(--dcf-tone) 34%, var(--dcf-border)) !important;
+  background: color-mix(in srgb, var(--dcf-tone) 8%, var(--dcf-surface)) !important;
+}
+
+html.dcf-active #visit_history_lyr .under_listbox li > a {
+  display: block;
+  overflow: hidden;
+  max-width: 160px;
+  color: var(--dcf-text) !important;
+  font-size: 11px;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.dcf-active #visit_history_lyr .tabcon_bottom {
+  border-top: 1px solid var(--dcf-border) !important;
+  background: var(--dcf-surface-2) !important;
+}
+
+html.dcf-active #visit_history_lyr .tabcon_bottom button {
+  border: 1px solid var(--dcf-border-strong) !important;
+  border-radius: 3px;
+  padding: 0 10px !important;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-muted) !important;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+html.dcf-active #visit_history_lyr .tabcon_bottom button:hover {
+  border-color: color-mix(in srgb, var(--dcf-tone) 45%, var(--dcf-border)) !important;
+  color: var(--dcf-link) !important;
+}
+
+html.dcf-active #visit_history_lyr .empty_visit,
+html.dcf-active #visit_history_lyr .empty_visit a,
+html.dcf-active #visit_history_lyr .empty_visit a span {
+  color: var(--dcf-muted) !important;
+}
+
+/* ==========================================================================
+   04. LIST
+   ========================================================================== */
+
+html.dcf-active #container.listwrap,
+html.dcf-active .left_content,
+html.dcf-active .right_content {
+  background: transparent !important;
+}
+
+/* ── Page head ───────────────────────────────────────────────────────────── */
+
+html.dcf-active .page_head {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 46px;
+  margin-bottom: 8px;
+  padding: 0 2px;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+html.dcf-active .page_head > .fl,
+html.dcf-active .page_head > .fr {
+  float: none !important;
+}
+
+html.dcf-active .page_head h2 {
+  margin: 0;
+  line-height: 1.2;
+}
+
+html.dcf-active .page_head h2,
+html.dcf-active .page_head h2 a {
+  color: var(--dcf-link) !important;
+  font-size: calc(17px * var(--dcf-font-scale)) !important;
+  font-weight: 700 !important;
+}
+
+/* Gallery-type mark after the title (마이너 ⓜ / 미니 mi / 인물). The site
+   sizes its sprite for a 24px title; at 17px it was larger than the text,
+   hung 6px low, and kept a fixed navy that vanished in dark. Redrawn as SVG
+   masks (the sprite host sends no CORS header, so it cannot be a mask),
+   sized in em off the title and painted in the title's own ink. */
+html.dcf-active .page_head h2 > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+html.dcf-active .page_head h2 .pagehead_titicon {
+  flex: none;
+  width: 0.88em !important;
+  height: 0.88em !important;
+  margin: 0 !important;
+  background: currentColor !important;
+  -webkit-mask: var(--dcf-titicon) center / contain no-repeat;
+  mask: var(--dcf-titicon) center / contain no-repeat;
+}
+
+html.dcf-active .page_head h2 .pagehead_titicon.mgall {
+  --dcf-titicon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Ccircle cx='11' cy='11' r='9.9' fill='none' stroke='black' stroke-width='1.7'/%3E%3Cpath d='M6.2 15.4V7.2h7.9a1.7 1.7 0 0 1 1.7 1.7v6.5h-2.4V9.4h-1.2v6H9.8v-6H8.6v6z'/%3E%3C/svg%3E");
+}
+
+html.dcf-active .page_head h2 .pagehead_titicon.ngall {
+  --dcf-titicon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 20'%3E%3Crect x='1' y='1' width='24' height='18' fill='none' stroke='black' stroke-width='2'/%3E%3Cpath d='M6.2 15.6V7.6h7.9a1.7 1.7 0 0 1 1.7 1.7v6.3h-2.4V9.8h-1.2v5.8H9.8V9.8H8.6v5.8z'/%3E%3Cpath d='M17 7.6h2.4v8H17zM17 4.2h2.4v2.2H17z'/%3E%3C/svg%3E");
+  width: 1.08em !important;
+  height: 0.83em !important;
+}
+
+html.dcf-active .page_head h2 .pagehead_titicon.pgall {
+  --dcf-titicon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Ccircle cx='11' cy='6.8' r='4.6' fill='none' stroke='black' stroke-width='1.7'/%3E%3Cpath d='M2.4 21.6a8.6 8.2 0 0 1 17.2 0' fill='none' stroke='black' stroke-width='1.7'/%3E%3C/svg%3E");
+}
+
+html.dcf-active .page_head button,
+html.dcf-active .page_head .gall_issuebox,
+html.dcf-active .page_head .gall_issuebox a {
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .page_head .gall_issuebox {
+  display: flex !important;
+  align-items: center;
+  width: auto !important;
+  height: 32px;
+  margin-left: auto;
+}
+
+html.dcf-active .page_head .gall_issuebox > .bundle,
+html.dcf-active .page_head .gall_issuebox > button {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+}
+
+html.dcf-active .page_head .gall_issuebox > .bundle > button,
+html.dcf-active .page_head .gall_issuebox > button {
+  box-sizing: border-box;
+  height: 28px;
+  border: 0 !important;
+  border-left: 1px solid var(--dcf-border) !important;
+  border-radius: 0 !important;
+  padding: 0 12px;
+  background: transparent !important;
+  color: var(--dcf-muted) !important;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+html.dcf-active .page_head .gall_issuebox > .bundle:first-child > button {
+  border-left: 0 !important;
+}
+
+/* The site's own "|" separators are dead weight next to our hairline. */
+html.dcf-active .page_head .gall_issuebox button::before,
+html.dcf-active .page_head .gall_issuebox button::after {
+  content: none !important;
+}
+
+html.dcf-active .page_head .gall_issuebox button:hover {
+  color: var(--dcf-link) !important;
+}
+
+/* ── Concept strip ────────────────────────────────────────────────────────
+   Only decorate .issue_wrap when it actually holds the recommendation box.
+   Minor-gallery view pages ship a hidden popup only, and a blanket card there
+   paints an empty tag bar. */
+
+html.dcf-active .issue_wrap:has(#gall_top_recom) {
+  box-sizing: border-box;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 4px;
+  padding: 10px 12px;
+  background: var(--dcf-surface) !important;
+  box-shadow: none;
+}
+
+html.dcf-active .issue_wrap a,
+html.dcf-active .concept_wrap a {
+  color: var(--dcf-text) !important;
+}
+
+/* ── Gallery front (대문) ─────────────────────────────────────────────────
+   Minor / mini / person galleries open the list with an intro block: image,
+   description, managers and the 흥한갤 rank. The site draws it on a white
+   slab under a 2px navy cap and paints the rank — tier name, digits, 위 and
+   the 전체 순위 button — as black sprite images, so the block glared white in
+   dark mode and could not take the palette at all.
+
+   Redrawn as one hairline card. The sprite text is replaced by the real text
+   the site already ships in .blind spans (no tier names are hard-coded); only
+   the weather icon survives, cut out of the same sprite.
+
+   Scoped to .listwrap: view pages keep the box hidden, and decorating it
+   there paints an empty bar (see Concept strip). Person galleries keep their
+   own profile layout below and only take the card and the palette. */
+
+html.dcf-active .listwrap .issue_wrap:has(.minor_intro_box) {
+  box-sizing: border-box;
+  margin-bottom: 10px;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 6px;
+  background: var(--dcf-surface) !important;
+  box-shadow: none;
+}
+
+html.dcf-active .listwrap .issue_wrap:has(.minor_intro_box) .issuebox,
+html.dcf-active .listwrap .issue_contentbox:has(> .minor_intro_box) {
+  border: 0 !important;
+  background: transparent !important;
+}
+
+/* Minor: [intro][rank panel]. */
+html.dcf-active .listwrap .issue_contentbox:has(> .minor_ranking_box) {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 168px;
+}
+
+html.dcf-active .listwrap .issue_contentbox:has(> .minor_ranking_box)::after {
+  content: none !important;
+}
+
+/* Intro: [image][rank line (mini) / description / meta]. Rows are explicit
+   so the image's height never opens an empty implicit row; whatever height
+   it adds lands in the last (1fr) row, under the meta. The text column
+   stacks with margins rather than row-gap so an absent row costs nothing. */
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box {
+  box-sizing: border-box;
+  display: grid !important;
+  grid-template-columns: 120px minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  align-content: start;
+  column-gap: 16px;
+  float: none !important;
+  width: auto !important;
+  min-width: 0;
+  padding: 16px 18px !important;
+  background: transparent !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box::after {
+  content: none !important;
+}
+
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box .img_contbox {
+  display: contents !important;
+}
+
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box .bgcover {
+  grid-column: 1;
+  grid-row: 1 / 4;
+}
+
+html.dcf-active .listwrap .minor_intro_box .mintro_imgbox {
+  box-sizing: border-box;
+  display: block;
+  float: none !important;
+  overflow: hidden;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 4px;
+  background-color: var(--dcf-surface-2) !important;
+  background-position: center !important;
+  background-size: cover !important;
+}
+
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box .mintro_imgbox {
+  width: 120px !important;
+  height: 80px !important;
+}
+
+html.dcf-active .listwrap .minor_intro_box .mintro_imgbox .cover {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  background-color: transparent !important;
+  background-position: center !important;
+  background-size: cover !important;
+}
+
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box .mintro_txtbox {
+  grid-column: 2;
+  grid-row: 2;
+  float: none !important;
+  width: auto !important;
+  height: auto !important;
+  /* Three lines. Longer descriptions scroll, as they do on the site. */
+  max-height: 60px;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  line-height: 20px;
+}
+
+html.dcf-active .listwrap .minor_intro_box .mintro_txt {
+  margin: 0;
+  color: var(--dcf-text) !important;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+html.dcf-active .listwrap .minor_intro_box .no_mintro_txt {
+  color: var(--dcf-subtle) !important;
+}
+
+/* Meta: managers, opening date, admin log — one wrapped line under a
+   hairline, labels muted and values in body ink. */
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box .info_contbox {
+  grid-column: 2;
+  grid-row: 3;
+  align-self: start;
+  box-sizing: border-box;
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 18px;
+  float: none !important;
+  width: auto !important;
+  height: auto !important;
+  max-height: 72px;
+  margin: 10px 0 0 !important;
+  border-top: 1px solid var(--dcf-border);
+  padding: 8px 0 0 !important;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box .info_contbox > .inner {
+  display: contents !important;
+}
+
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box .info_cont {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  margin: 0 !important;
+  overflow: visible !important;
+  line-height: 20px !important;
+}
+
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box .info_cont .tit {
+  float: none !important;
+  width: auto !important;
+  color: var(--dcf-muted) !important;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+html.dcf-active .listwrap .minor_intro_box .info_cont .tit::before {
+  content: none !important;
+}
+
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box .info_cont .cont {
+  float: none !important;
+  min-width: 0;
+  margin: 0 !important;
+  color: var(--dcf-text) !important;
+  font-size: 12px;
+  /* Break between managers, never inside "ㅇㅇ(id)". */
+  word-break: keep-all;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+}
+
+/* Sub-managers arrive nested one inside the next (unclosed spans in the
+   site markup), so a dot before every nested one separates them inline. */
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box .mng_nick {
+  display: inline !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box .mng_nick .mng_nick::before {
+  margin: 0 6px;
+  color: var(--dcf-subtle);
+  content: "·";
+}
+
+html.dcf-active .listwrap .minor_intro_box .mng_nick.absence {
+  color: var(--dcf-muted) !important;
+}
+
+html.dcf-active .listwrap .minor_intro_box .mng_nick.absence .txt,
+html.dcf-active .listwrap .minor_intro_box .absence .txt {
+  color: var(--dcf-danger) !important;
+}
+
+html.dcf-active .listwrap .minor_intro_box .btn_mngadmin_report {
+  margin: 0 !important;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dcf-link) !important;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 20px;
+  text-decoration: none !important;
+  cursor: pointer;
+}
+
+html.dcf-active .listwrap .minor_intro_box .btn_mngadmin_report:hover {
+  text-decoration: underline !important;
+}
+
+/* Mini galleries print their rank as a text line above the description. */
+html.dcf-active .dcwrap:not(.personwrap) .listwrap .minor_intro_box .mini_info {
+  grid-column: 2;
+  grid-row: 1;
+  float: none !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 0 4px !important;
+  padding: 0 !important;
+}
+
+html.dcf-active .listwrap .mini_info .inner,
+html.dcf-active .personwrap .page_head .ranking {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Person rank follows the title on the same line: give it room from the
+   type mark instead of butting against it. */
+html.dcf-active .personwrap .page_head .ranking {
+  margin-left: 12px !important;
+  vertical-align: middle;
+}
+
+html.dcf-active .listwrap .mini_info .rankingcon,
+html.dcf-active .personwrap .page_head .ranking .rankingcon {
+  margin: 0 !important;
+  vertical-align: middle;
+}
+
+html.dcf-active .listwrap .mini_info .mini_ranktxt,
+html.dcf-active .personwrap .page_head .ranking .ranktxt {
+  margin: 0 !important;
+  color: var(--dcf-muted) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 18px !important;
+}
+
+html.dcf-active .listwrap .mini_info .mini_ranknum,
+html.dcf-active .personwrap .page_head .ranking .ranknum {
+  margin: 0 !important;
+  color: var(--dcf-text) !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px !important;
+}
+
+html.dcf-active .listwrap .mini_info .mini_ranknum.font_grey {
+  color: var(--dcf-muted) !important;
+  font-weight: 500 !important;
+}
+
+html.dcf-active .listwrap .mini_info .rankgallshow,
+html.dcf-active .personwrap .page_head .ranking .rankgallshow {
+  margin: 0 0 0 4px !important;
+  color: var(--dcf-muted) !important;
+  font-size: 11px !important;
+  line-height: 18px !important;
+  text-decoration: none !important;
+  vertical-align: middle !important;
+}
+
+html.dcf-active .listwrap .mini_info .rankgallshow:hover,
+html.dcf-active .personwrap .page_head .ranking .rankgallshow:hover {
+  color: var(--dcf-link) !important;
+}
+
+/* ── Rank panel (minor) ── */
+
+html.dcf-active .listwrap .minor_ranking_box {
+  position: relative;
+  box-sizing: border-box;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  float: none !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 112px;
+  border-left: 1px solid var(--dcf-border) !important;
+  padding: 14px 12px !important;
+  background: transparent !important;
+  text-align: center;
+}
+
+html.dcf-active .listwrap .minor_ranking_box > .ranking {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Tier: weather icon from the site sprite (scaled to 60%) + the tier name
+   from .blind. The sprite stays on the element only so ::before can inherit
+   its URL; it is pushed out of view. Coordinates are the icon's box inside
+   sp_minor_txt.png, per tier class. Unknown tiers show the name alone. */
+html.dcf-active .listwrap .minor_ranking_box .ranking_tit {
+  --dcf-tier-x: 0;
+  --dcf-tier-y: 0;
+  --dcf-tier-w: 0;
+  --dcf-tier-h: 0;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px;
+  width: auto !important;
+  height: 20px !important;
+  margin: 0 !important;
+  background-position: -9999px -9999px !important;
+}
+
+html.dcf-active .listwrap .minor_ranking_box .ranking_tit.hot { --dcf-tier-x: 0; --dcf-tier-y: 0; --dcf-tier-w: 30; --dcf-tier-h: 31; }
+html.dcf-active .listwrap .minor_ranking_box .ranking_tit.newgall { --dcf-tier-x: 0; --dcf-tier-y: 41; --dcf-tier-w: 32; --dcf-tier-h: 24; }
+html.dcf-active .listwrap .minor_ranking_box .ranking_tit.nohot { --dcf-tier-x: 0; --dcf-tier-y: 78; --dcf-tier-w: 31; --dcf-tier-h: 29; }
+html.dcf-active .listwrap .minor_ranking_box .ranking_tit.darkness { --dcf-tier-x: 0; --dcf-tier-y: 117; --dcf-tier-w: 28; --dcf-tier-h: 29; }
+html.dcf-active .listwrap .minor_ranking_box .ranking_tit.bighot { --dcf-tier-x: 111; --dcf-tier-y: 0; --dcf-tier-w: 29; --dcf-tier-h: 27; }
+html.dcf-active .listwrap .minor_ranking_box .ranking_tit.hot1 { --dcf-tier-x: 117; --dcf-tier-y: 37; --dcf-tier-w: 29; --dcf-tier-h: 27; }
+html.dcf-active .listwrap .minor_ranking_box .ranking_tit.normal { --dcf-tier-x: 129; --dcf-tier-y: 74; --dcf-tier-w: 32; --dcf-tier-h: 24; }
+html.dcf-active .listwrap .minor_ranking_box .ranking_tit.darkness1 { --dcf-tier-x: 110; --dcf-tier-y: 112; --dcf-tier-w: 25; --dcf-tier-h: 27; }
+
+html.dcf-active .listwrap .minor_ranking_box .ranking_tit::before {
+  flex: none;
+  width: calc(var(--dcf-tier-w) * 0.6px);
+  height: calc(var(--dcf-tier-h) * 0.6px);
+  background-image: inherit;
+  background-position: calc(var(--dcf-tier-x) * -0.6px) calc(var(--dcf-tier-y) * -0.6px);
+  background-repeat: no-repeat;
+  background-size: 180px 180px;
+  content: "";
+}
+
+html.dcf-active .listwrap .minor_ranking_box .ranking_tit .blind {
+  display: inline !important;
+  color: var(--dcf-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+/* The site hides .blind text with an absolutely positioned, invisible 0×0
+   box. Undo all of it for the rank texts this card reads out. */
+html.dcf-active .listwrap .minor_ranking_box .ranking_tit .blind,
+html.dcf-active .listwrap .minor_ranking_box .rank_img .blind,
+html.dcf-active .listwrap .minor_ranking_box .btn_hotall_list .blind {
+  position: static !important;
+  overflow: visible !important;
+  width: auto !important;
+  height: auto !important;
+  visibility: visible !important;
+}
+
+/* Digits and 위: the site's .blind text, set in the board's own type. */
+html.dcf-active .listwrap .minor_ranking_box .rank_img {
+  display: flex !important;
+  align-items: baseline;
+  justify-content: center;
+  padding: 0 !important;
+  font-size: 0;
+}
+
+html.dcf-active .listwrap .minor_ranking_box .rank_img > span {
+  display: inline !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  background: none !important;
+}
+
+html.dcf-active .listwrap .minor_ranking_box .num_img .blind {
+  display: inline !important;
+  color: var(--dcf-text);
+  font-size: 30px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 34px;
+}
+
+html.dcf-active .listwrap .minor_ranking_box .txt_img .blind {
+  display: inline !important;
+  margin-left: 2px;
+  color: var(--dcf-muted);
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* "순위권 밖" ships as a sprite with no text twin. */
+html.dcf-active .listwrap .minor_ranking_box .outsied_img::before {
+  color: var(--dcf-muted);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 34px;
+  content: "순위권 밖";
+}
+
+html.dcf-active .listwrap .minor_ranking_box .btn_hotall_list {
+  box-sizing: border-box;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: auto !important;
+  height: 26px !important;
+  margin: 0 !important;
+  border: 1px solid var(--dcf-border-strong) !important;
+  border-radius: 3px;
+  padding: 0 10px !important;
+  background: var(--dcf-surface) !important;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+html.dcf-active .listwrap .minor_ranking_box .btn_hotall_list .blind {
+  display: inline !important;
+  color: var(--dcf-muted);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+html.dcf-active .listwrap .minor_ranking_box .btn_hotall_list:hover {
+  border-color: color-mix(in oklab, var(--dcf-tone) 45%, var(--dcf-border-strong)) !important;
+  background: color-mix(in oklab, var(--dcf-tone) 7%, var(--dcf-surface)) !important;
+}
+
+html.dcf-active .listwrap .minor_ranking_box .btn_hotall_list:hover .blind {
+  color: var(--dcf-link);
+}
+
+/* 흥한갤이란: the site's grey corner flag becomes a small "?" disc. */
+html.dcf-active .listwrap .minor_ranking_box .btn_mgall_dcp {
+  top: 8px !important;
+  right: 8px !important;
+  display: grid !important;
+  place-items: center;
+  width: 18px !important;
+  height: 18px !important;
+  border: 1px solid var(--dcf-border-strong) !important;
+  border-radius: 50%;
+  padding: 0 !important;
+  background: transparent !important;
+  cursor: pointer;
+}
+
+html.dcf-active .listwrap .minor_ranking_box .btn_mgall_dcp .icon_mgall_dcp {
+  display: none !important;
+}
+
+html.dcf-active .listwrap .minor_ranking_box .btn_mgall_dcp::before {
+  color: var(--dcf-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  content: "?";
+}
+
+html.dcf-active .listwrap .minor_ranking_box .btn_mgall_dcp:hover {
+  border-color: color-mix(in oklab, var(--dcf-tone) 45%, var(--dcf-border-strong)) !important;
+}
+
+/* The explainer tip that hangs off "?". */
+html.dcf-active .listwrap .minor_ranking_box .pop_tipbox .inner {
+  border: 1px solid var(--dcf-border-strong) !important;
+  border-radius: 4px;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+  box-shadow: var(--dcf-shadow);
+  text-align: left;
+}
+
+html.dcf-active .listwrap .minor_ranking_box .pop_tipbox .minor_tip_txt,
+html.dcf-active .listwrap .minor_ranking_box .pop_tipbox .minor_tip_txt * {
+  color: var(--dcf-text) !important;
+}
+
+/* ── Person galleries: profile layout kept, card + palette only ── */
+
+html.dcf-active .personwrap .listwrap .issue_contentbox {
+  border: 0 !important;
+}
+
+html.dcf-active .personwrap .listwrap .minor_intro_box {
+  padding: 16px 18px !important;
+  background: transparent !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .personwrap .listwrap .info_cont .tit {
+  color: var(--dcf-muted) !important;
+}
+
+html.dcf-active .personwrap .listwrap .info_cont .cont,
+html.dcf-active .personwrap .listwrap .info_cont .cont_txt {
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .personwrap .listwrap .info_cont .cont_txt > a,
+html.dcf-active .personwrap .listwrap .network_box .font_blue {
+  color: var(--dcf-link) !important;
+}
+
+html.dcf-active .personwrap .listwrap .info_cont .cont_txt > a + a::before {
+  color: var(--dcf-subtle) !important;
+}
+
+html.dcf-active .personwrap .listwrap .network_box {
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 4px;
+  background: var(--dcf-surface) !important;
+}
+
+html.dcf-active .personwrap .listwrap .network_box .top {
+  border-bottom: 1px solid var(--dcf-border);
+  border-radius: 3px 3px 0 0;
+  background: var(--dcf-surface-2) !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .personwrap .listwrap .network_box .top .num {
+  color: var(--dcf-muted) !important;
+}
+
+html.dcf-active .personwrap .listwrap .network_box .lst li,
+html.dcf-active .personwrap .listwrap .network_box .lst a,
+html.dcf-active .personwrap .listwrap .network_box .empty_box {
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .personwrap .listwrap .btm_contbox .btn_edit,
+html.dcf-active .personwrap .listwrap .btm_contbox .rt .btn_mng_history {
+  border-color: var(--dcf-border-strong) !important;
+  border-radius: 3px !important;
+  background: transparent !important;
+  color: var(--dcf-muted) !important;
+}
+
+html.dcf-active .personwrap .listwrap .btm_contbox .btn_info,
+html.dcf-active .personwrap .listwrap .btm_contbox .rt > *,
+html.dcf-active .personwrap .listwrap .btm_contbox .rt .mng_nick {
+  color: var(--dcf-muted) !important;
+}
+
+html.dcf-active .personwrap .listwrap .btm_contbox .rt .btn_mngadmin_report {
+  color: var(--dcf-link) !important;
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────────
+   A flat strip, not a card: hairline bottom rule, no radius, no shadow, and
+   one dominant 글쓰기 action. It merges into the board's own enclosure. */
+
+html.dcf-active .list_array_option {
+  box-sizing: border-box;
+  display: grid !important;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  column-gap: 12px;
+  width: 100% !important;
+  min-height: 44px;
+  margin-top: 6px;
+  border: 1px solid var(--dcf-border) !important;
+  border-bottom: 0 !important;
+  border-radius: 6px 6px 0 0;
+  padding: 5px 8px;
+  background: var(--dcf-surface-2) !important;
+  color: var(--dcf-text) !important;
+  box-shadow: none;
+}
+
+html.dcf-active .list_array_option .fl,
+html.dcf-active .list_array_option .fr,
+html.dcf-active .list_array_option .left_box,
+html.dcf-active .list_array_option .right_box,
+html.dcf-active .list_array_option .output_array,
+html.dcf-active .list_array_option .select_box {
+  float: none !important;
+}
+
+/* Sort tabs — original segmented look kept, but flat and 3px. */
+html.dcf-active .list_array_option .array_tab.left_box {
+  box-sizing: border-box;
+  display: inline-flex !important;
+  align-items: center;
+  width: auto !important;
+  height: 32px;
+  overflow: hidden;
+  border: 1px solid var(--dcf-border-strong);
+  border-radius: 4px;
+  padding: 2px;
+  background: var(--dcf-surface);
+}
+
+html.dcf-active .list_array_option .array_tab button {
+  box-sizing: border-box;
+  flex: 0 0 70px;
+  min-width: 70px;
+  height: 26px;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 3px;
+  padding: 0 10px;
+  background: transparent !important;
+  color: var(--dcf-muted) !important;
+  font-weight: 500;
+  line-height: 26px;
+  cursor: pointer;
+}
+
+html.dcf-active .list_array_option .array_tab button:hover {
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .list_array_option .array_tab button.on {
+  background: var(--dcf-accent-fill) !important;
+  color: var(--dcf-on-accent) !important;
+  font-weight: 600;
+}
+
+/* Subject (말머리) column: its own track so long lists never push the page
+   count or the write button out of the strip. */
+html.dcf-active .list_array_option .center_box {
+  box-sizing: border-box;
+  position: relative;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 32px;
+  line-height: normal !important;
+}
+
+html.dcf-active .list_array_option .center_box > .inner {
+  box-sizing: border-box;
+  position: relative;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding-right: 26px;
+}
+
+html.dcf-active .list_array_option .center_box > .inner > ul {
+  box-sizing: border-box;
+  display: flex !important;
+  align-items: center;
+  gap: 2px;
+  float: none !important;
+  min-width: 0;
+  height: 30px;
+  margin: 0 !important;
+  overflow: hidden;
+  padding: 0 !important;
+  line-height: 30px;
+  white-space: nowrap;
+}
+
+html.dcf-active .list_array_option .center_box > .inner > ul > li {
+  display: block;
+  flex: 0 0 auto;
+  height: 30px;
+  margin: 0;
+  padding: 0 !important;
+}
+
+html.dcf-active .list_array_option .center_box > .inner > ul > li > a {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  border-radius: 3px;
+  padding: 0 7px;
+  color: var(--dcf-muted) !important;
+  font-weight: 500;
+  line-height: 26px;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+html.dcf-active .list_array_option .center_box > .inner > ul > li > a:hover {
+  background: color-mix(in srgb, var(--dcf-tone) 10%, transparent);
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .list_array_option .center_box > .inner > ul > li > a.on {
+  background: color-mix(in srgb, var(--dcf-tone) 14%, transparent);
+  color: var(--dcf-link) !important;
+  font-weight: 600;
+}
+
+html.dcf-active .list_array_option .btn_subject_more {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 28px;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 3px;
+  background: transparent !important;
+  color: var(--dcf-muted);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+html.dcf-active .list_array_option .btn_subject_more:hover {
+  background: color-mix(in srgb, var(--dcf-tone) 10%, transparent) !important;
+  color: var(--dcf-link);
+}
+
+html.dcf-active .list_array_option .subject_morelist {
+  top: 32px;
+  right: 0;
+  margin: 0;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 4px;
+  background: var(--dcf-surface) !important;
+  line-height: normal;
+  box-shadow: var(--dcf-shadow);
+}
+
+html.dcf-active .list_array_option .right_box {
+  box-sizing: border-box;
+  position: static !important;
+  display: flex !important;
+  align-items: center;
+  width: auto !important;
+  height: 32px;
+  margin-left: auto;
+  padding: 0 !important;
+}
+
+html.dcf-active .list_array_option .output_array {
+  box-sizing: border-box;
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  width: auto !important;
+  height: 32px;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html.dcf-active .list_array_option .select_box.array_num {
+  position: relative;
+  width: 66px !important;
+  height: 30px;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html.dcf-active .list_array_option .select_box.array_num .select_area,
+html.dcf-active .list_array_option .select_box.array_num .select_area a {
+  box-sizing: border-box;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 66px !important;
+  height: 30px !important;
+  border: 1px solid var(--dcf-border-strong) !important;
+  border-radius: 3px;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 28px !important;
+}
+
+/* The one dominant action in the strip. */
+html.dcf-active .list_array_option .btn_write.txt,
+html.dcf-active #btn_write.btn_blue.write,
+html.dcf-active .btn_blue,
+html.dcf-active button.btn_blue,
+html.dcf-active .list_bottom.btn_blue {
+  border: 1px solid var(--dcf-accent-fill) !important;
+  border-radius: 3px !important;
+  background: var(--dcf-accent-fill) !important;
+  background-image: none !important;
+  color: var(--dcf-on-accent) !important;
+  font-weight: 600 !important;
+}
+
+html.dcf-active .list_array_option .btn_write.txt {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  height: 30px;
+  margin: 0 !important;
+  padding: 0 14px;
+  line-height: 28px !important;
+}
+
+html.dcf-active .list_array_option .btn_write.txt:hover,
+html.dcf-active #btn_write.btn_blue.write:hover {
+  border-color: var(--dcf-accent-fill-hover) !important;
+  background: var(--dcf-accent-fill-hover) !important;
+}
+
+html.dcf-active .list_bottom_btnbox .btn_white,
+html.dcf-active .array_tab .btn_white {
+  border: 1px solid var(--dcf-border-strong) !important;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+  font-weight: 500;
+}
+
+/* ── The board itself ─────────────────────────────────────────────────────
+   One enclosed rectangle. The toolbar above supplies the top edge, so the
+   board contributes only the sides and bottom; together they read as a single
+   bordered block with a flat header strip. */
+
+html.dcf-active .gall_listwrap {
+  box-sizing: border-box;
+  overflow: visible;
+  margin-top: 8px;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 6px;
+  background: var(--dcf-surface) !important;
+  background-clip: padding-box;
+  box-shadow: none;
+}
+
+html.dcf-active .list_array_option + .gall_listwrap {
+  margin-top: 0;
+  border-top: 0 !important;
+  border-radius: 0 0 6px 6px;
+}
+
+html.dcf-active .gall_list {
+  width: 100%;
+  border-collapse: collapse;
+  border-color: var(--dcf-border) !important;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .gall_list thead th {
+  border-color: var(--dcf-border) !important;
+  border-bottom: 1px solid var(--dcf-border) !important;
+  background: var(--dcf-surface-2) !important;
+  color: var(--dcf-muted) !important;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+html.dcf-active .gall_list tbody,
+html.dcf-active .gall_list tbody tr,
+html.dcf-active .gall_list tbody td {
+  border-color: var(--dcf-border) !important;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+}
+
+/* Rows are separated by hairlines, never by per-row cards. */
+html.dcf-active .gall_list tbody td {
+  border: 0 !important;
+  border-bottom: 1px solid var(--dcf-border) !important;
+}
+
+html.dcf-active .gall_list tbody tr:last-child > td {
+  border-bottom: 0 !important;
+}
+
+/* Notice / issue / ad rows are not posts. Flat tint, no interaction. */
+html.dcf-active .gall_list tbody tr:not([data-no]) td,
+html.dcf-active .gall_list tbody tr:not(.us-post) td {
+  background: color-mix(in srgb, var(--dcf-surface-2) 60%, var(--dcf-surface)) !important;
+}
+
+html.dcf-active .gall_list a,
+html.dcf-active .gall_list a:visited {
+  color: var(--dcf-text) !important;
+  text-decoration: none;
+}
+
+html.dcf-active .gall_list a:hover {
+  color: var(--dcf-link) !important;
+}
+
+/* ── Row rhythm ─────────────────────────────────────────────────────────── */
+
+html.dcf-active .gall_list tbody tr.ub-content > td,
+html.dcf-active .gall_list tbody tr.us-post > td,
+html.dcf-active .gall_list tbody tr[data-no] > td {
+  box-sizing: border-box;
+  height: 34px;
+  min-height: 34px;
+  padding: 6px 8px;
+  vertical-align: middle;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+/* Title: the actual redesign lever. 13/600, one line, ellipsis.
+   The comment count, ratio badge and reading status follow the title on the
+   same line. The title alone truncates: it gives up room for whichever of
+   those the cell actually holds, so nothing drops to a second line. */
+html.dcf-active .gall_list td.gall_tit {
+  --dcf-tit-reply: 0px;
+  --dcf-tit-ratio: 0px;
+  --dcf-tit-read: 0px;
+  overflow: hidden;
+  padding-right: 10px !important;
+  white-space: nowrap;
+}
+
+html.dcf-active .gall_list td.gall_tit:has(.reply_num) { --dcf-tit-reply: 40px; }
+html.dcf-active .gall_list td.gall_tit:has(.dcf-ratio-badge) { --dcf-tit-ratio: 72px; }
+html.dcf-active .gall_list td.gall_tit:has(.dcf-read-label) { --dcf-tit-read: 30px; }
+html.dcf-active .gall_list td.gall_tit:has(.dcf-comment-delta) { --dcf-tit-read: 62px; }
+
+html.dcf-active .gall_list td.gall_tit > a:first-of-type {
+  display: inline-block;
+  max-width: calc(100% - var(--dcf-tit-reply) - var(--dcf-tit-ratio) - var(--dcf-tit-read));
+  overflow: hidden;
+  color: var(--dcf-text) !important;
+  font-size: calc(13px * var(--dcf-font-scale)) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
+  line-height: 1.45 !important;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Comment count, tight to the title's right. */
+html.dcf-active .gall_list td.gall_tit .reply_num,
+html.dcf-active .gall_list td.gall_recommend .reply_num,
+html.dcf-active .gall_list .reply_num {
+  margin-left: 4px;
+  color: var(--dcf-link) !important;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-decoration: none !important;
+}
+
+/* Category tag (말머리) inside the title cell. */
+html.dcf-active .gall_list td.gall_tit .gall_subject,
+html.dcf-active .gall_list td.gall_tit .txt_subject {
+  margin-right: 5px;
+  color: var(--dcf-muted) !important;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Author: 11/500 muted, with the id/IP tags inline at 10px. */
+html.dcf-active .gall_list td.gall_writer.ub-writer,
+html.dcf-active .gall_list td.gall_writer {
+  overflow: hidden;
+  color: var(--dcf-muted) !important;
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.dcf-active .gall_list td.gall_writer a,
+html.dcf-active .gall_list td.gall_writer .nickname {
+  color: var(--dcf-muted) !important;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Date / views / recommend: right-aligned tabular columns that never jitter. */
+html.dcf-active .gall_list .gall_date,
+html.dcf-active .gall_list .gall_count,
+html.dcf-active .gall_list .gall_recommend,
+html.dcf-active .gall_list td.gall_num {
+  color: var(--dcf-muted) !important;
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+}
+
+html.dcf-active td.dcf-full-date {
+  color: var(--dcf-muted) !important;
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+
+/* dcf-full-time prints yy.mm.dd hh:mm, which needs more room than the site's
+   default date column. The list is table-layout:fixed with an inline-width
+   colgroup, so the col has to be overridden — and a cell min-width backs it up
+   on layouts that ignore the col. 104px covers the 11px tabular string. */
+html.dcf-full-time .gall_list > colgroup > col:nth-last-child(3) {
+  width: 104px !important;
+}
+
+html.dcf-full-time .gall_list td.gall_date {
+  min-width: 104px;
+}
+
+/* ── Row states ─────────────────────────────────────────────────────────── */
+
+html.dcf-active .ub-content,
+html.dcf-active .ub-content td,
+html.dcf-active .ub-content td > a:first-of-type {
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+/* Hover: a flat wash. No lift, no shadow. */
+html.dcf-active .ub-content:hover > td {
+  background: var(--dcf-surface-2) !important;
+}
+
+html.dcf-active .ub-content:hover > td,
+html.dcf-active .ub-content:hover td.gall_tit > a:first-of-type {
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .ub-content.filtered-row,
+html.dcf-active .dcf-hidden-promo-row {
+  display: none !important;
+}
+
+/* Dim, do not hide: DC-native blocked posts stay visible but clearly inert. */
+html.dcf-active .dcf-native-blocked > td {
+  opacity: 0.5;
+}
+
+/* ── Already read (reading.js) ────────────────────────────────────────────
+   Two class hooks on the row: dcf-read-row on the <tr>, dcf-read-link on the
+   <a> inside td.gall_tit. reading.js REMOVES both when a record is cleared,
+   so nothing here may rely on an add-only transition. */
+
+html.dcf-active .ub-content.dcf-read-row {
+  background-color: color-mix(in srgb, var(--dcf-surface-2) 70%, var(--dcf-surface)) !important;
+}
+
+html.dcf-active .ub-content.dcf-read-row > td {
+  background-color: color-mix(in srgb, var(--dcf-surface-2) 70%, var(--dcf-surface)) !important;
+}
+
+html.dcf-active .gall_list .dcf-read-row td.gall_tit > a:first-of-type {
+  color: var(--dcf-muted) !important;
+  font-weight: 500 !important;
+}
+
+html.dcf-active .gall_list .gall_tit a.dcf-read-link:not(:hover) {
+  color: var(--dcf-muted) !important;
+  font-weight: 500 !important;
+}
+
+/* Precedence, stated rather than left to source order:
+   READ + SELECTED = selected. The row keeps the accent wash — so it is still
+   obviously the cursor row — but its title stays muted, because "I have read
+   this" remains true and useful while selected. Return-row wins over both. */
+html.dcf-active .ub-content.dcf-selected-row.dcf-read-row td.gall_tit > a:first-of-type,
+html.dcf-active .ub-content.dcf-selected-row.dcf-read-row .gall_tit a.dcf-read-link {
+  color: var(--dcf-muted) !important;
+}
+
+html.dcf-active .ub-content.dcf-return-row.dcf-read-row td.gall_tit > a:first-of-type {
+  color: var(--dcf-text) !important;
+  font-weight: 600 !important;
+}
+
+/* ── Selected ───────────────────────────────────────────────────────────── */
+
+html.dcf-active .ub-content.dcf-selected-row,
+html.dcf-active .ub-content.dcf-selected-row > td {
+  background-color: color-mix(in srgb, var(--dcf-tone) 12%, var(--dcf-surface)) !important;
+}
+
+html.dcf-active .ub-content.dcf-selected-row > td:first-child {
+  box-shadow: inset 2px 0 0 var(--dcf-tone);
+}
+
+/* ── New on refresh (dcf-new-row) ─────────────────────────────────────────
+   One-shot: JS adds the class, the tint fades out, and the class stays. The
+   animation must therefore end on a plain surface with no residual color. */
+
+html.dcf-active .ub-content.dcf-new-row > td {
+  animation: dcf-new-row 1.6s ease-out;
+}
+
+@keyframes dcf-new-row {
+  0% { background-color: color-mix(in srgb, var(--dcf-tone) 22%, var(--dcf-surface)); }
+  100% { background-color: var(--dcf-surface); }
+}
+
+/* ── Return to position (dcf-return-row) ──────────────────────────────────
+   A different moment from dcf-new-row: back-navigation landed here. It reads
+   as a left accent rail that settles, NOT as a background tint that arrives.
+   The rail lives on box-shadow so a co-occurring dcf-new-row background
+   animation is never fought over. */
+
+html.dcf-active .ub-content.dcf-return-row > td:first-child {
+  box-shadow: inset 2px 0 0 var(--dcf-tone);
+}
+
+html.dcf-active .ub-content.dcf-return-row > td {
+  animation: dcf-return-settle 1.8s ease-out both;
+}
+
+@keyframes dcf-return-settle {
+  0% {
+    box-shadow: inset 14px 0 0 color-mix(in srgb, var(--dcf-tone) 42%, transparent);
+    background-color: color-mix(in srgb, var(--dcf-tone) 14%, var(--dcf-surface));
+  }
+  100% {
+    box-shadow: inset 0 0 0 transparent;
+    background-color: transparent;
+  }
+}
+
+/* Selected + return: the return pulse starts from the tint it already has so
+   there is no visible jump, and the rail hands over to the selected rail. */
+html.dcf-active .ub-content.dcf-return-row.dcf-selected-row > td {
+  animation-name: dcf-return-settle-selected;
+}
+
+@keyframes dcf-return-settle-selected {
+  0% { box-shadow: inset 14px 0 0 color-mix(in srgb, var(--dcf-tone) 42%, transparent); }
+  100% { box-shadow: inset 0 0 0 transparent; }
+}
+
+/* ── Read status pill (reading.js) ────────────────────────────────────────
+   .dcf-reading-status (owned span) > .dcf-read-label + optional
+   .dcf-comment-delta. Injected into td.gall_tit next to the title. */
+
+.dcf-reading-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 5px;
+  vertical-align: middle;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.dcf-read-label {
+  color: var(--dcf-subtle) !important;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* +N comment growth. A 3px tag, not a pill. */
+.dcf-comment-delta {
+  border: 1px solid color-mix(in srgb, var(--dcf-tone) 24%, var(--dcf-border));
+  border-radius: 3px;
+  padding: 0 3px;
+  background: color-mix(in srgb, var(--dcf-tone) 10%, var(--dcf-surface));
+  color: var(--dcf-link) !important;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+}
+
+/* ── Paging & bottom strip ──────────────────────────────────────────────── */
+
+html.dcf-active .bottom_paging_box a,
+html.dcf-active .bottom_paging_box em,
+html.dcf-active .buttom_search_wrap,
+html.dcf-active .list_bottom_btnbox {
+  color: var(--dcf-muted) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+html.dcf-active .bottom_paging_box em {
+  color: var(--dcf-link) !important;
+}
+
+html.dcf-active .bottom_paging_box.iconpaging {
+  border-color: var(--dcf-border) !important;
+}
+
+html.dcf-active .bottom_paging_box.iconpaging a,
+html.dcf-active .bottom_paging_box.iconpaging span,
+html.dcf-active .bottom_paging_box.iconpaging em {
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+html.dcf-active .bottom_paging_box.iconpaging a:hover {
+  border-color: var(--dcf-border-strong);
+  background: var(--dcf-surface-2);
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .list_bottom_btnbox {
+  display: flex !important;
+  justify-content: flex-end;
+  padding-top: 12px;
+}
+
+html.dcf-active .list_bottom_btnbox > .fl { display: none !important; }
+
+html.dcf-active .list_bottom_btnbox > .fr {
+  margin-left: auto;
+  float: none !important;
+}
+
+/* ── Compact mode ───────────────────────────────────────────────────────── */
+
+html.dcf-compact .gall_list tbody tr.ub-content > td,
+html.dcf-compact .gall_list tbody tr.us-post > td,
+html.dcf-compact .gall_list tbody tr[data-no] > td,
+html.dcf-compact .ub-content > td {
+  height: 26px !important;
+  min-height: 26px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+html.dcf-compact .dcf-reading-status,
+html.dcf-compact .dcf-id-badge,
+html.dcf-compact .dcf-ip-badge {
+  display: none !important;
+}
+
+/* ==========================================================================
+   05. RIGHT RAIL
+   ========================================================================== */
+
+html.dcf-active .right_content .login_box,
+html.dcf-active .right_content .content_box {
+  box-sizing: border-box;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 4px;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+  box-shadow: none;
+}
+
+/* The profile box's favorite/scrap/notify panels unfold outside the card.
+   Keep clipping content boxes; leave the profile box's layers intact. */
+html.dcf-active .right_content .content_box { overflow: hidden; }
+
+html.dcf-active .right_content .login_box {
+  position: relative;
+  z-index: 50;
+  overflow: visible !important;
+}
+
+html.dcf-active .login_box .user_info {
+  border-radius: 3px 3px 0 0;
+}
+
+html.dcf-active .login_box .user_option {
+  border-radius: 0 0 3px 3px;
+}
+
+html.dcf-active .login_box .user_info,
+html.dcf-active .login_box .user_option,
+html.dcf-active .content_box > header {
+  border-color: var(--dcf-border) !important;
+  background: var(--dcf-surface-2) !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .login_box a,
+html.dcf-active .login_box strong,
+html.dcf-active .content_box a,
+html.dcf-active .content_box .tit,
+html.dcf-active .content_box .tit a {
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .content_box li,
+html.dcf-active .content_box .rcont_list li,
+html.dcf-active .content_box .rcont_imgtxt_box {
+  border-color: var(--dcf-border) !important;
+  background-color: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+}
+
+/* ==========================================================================
+   06. POST VIEW
+   ========================================================================== */
+
+html.dcf-active .view_content_wrap,
+html.dcf-active .gallview_head,
+html.dcf-active .gallview_contents,
+html.dcf-active .writing_view_box,
+html.dcf-active .comment_wrap,
+html.dcf-active .comment_box,
+html.dcf-active .cmt_write_box,
+html.dcf-active .reply_box {
+  border-color: var(--dcf-border) !important;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+}
+
+/* One hairline enclosure for the post, same family as the list board. */
+html.dcf-active .view_content_wrap {
+  box-sizing: border-box;
+  overflow: visible;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 6px !important;
+  box-shadow: none;
+}
+
+html.dcf-active .view_content_wrap .gallview_head {
+  border-radius: 5px 5px 0 0 !important;
+  border-top: 0 !important;
+  border-bottom: 1px solid var(--dcf-border) !important;
+}
+
+html.dcf-active .view_content_wrap .gallview_contents {
+  border-radius: 0 0 5px 5px !important;
+  border-bottom: 0 !important;
+}
+
+/* ── Post head ────────────────────────────────────────────────────────────
+   The site separates nickname/date/views/recommend with content:"" 1px bars.
+   Delete them and use spacing. */
+
+html.dcf-active .gallview_head .gall_writer .fl span::before,
+html.dcf-active .gallview_head .gall_writer .fl span::after,
+html.dcf-active .gallview_head .gall_writer .fr > span::before,
+html.dcf-active .gallview_head .gall_writer .fr > span::after,
+html.dcf-active .gallview_head .gall_date::before {
+  content: none !important;
+}
+
+html.dcf-active .gallview_head .title {
+  margin-bottom: 8px !important;
+}
+
+html.dcf-active .gallview_head .title_subject {
+  color: var(--dcf-text) !important;
+  font-size: calc(17px * var(--dcf-font-scale)) !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em;
+  line-height: 1.4 !important;
+}
+
+html.dcf-active .gallview_head .title_headtext {
+  color: var(--dcf-link) !important;
+  font-size: calc(17px * var(--dcf-font-scale)) !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+}
+
+html.dcf-active .gallview_head .gall_date {
+  margin-left: 10px !important;
+  padding: 0 !important;
+  color: var(--dcf-muted) !important;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+html.dcf-active .gallview_head .gall_writer,
+html.dcf-active .gallview_head .gall_writer .fl,
+html.dcf-active .gallview_head .gall_writer .fr {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+html.dcf-active .gallview_head .gall_writer .fr {
+  display: flex !important;
+  align-items: center;
+  gap: 16px;
+}
+
+html.dcf-active .gallview_head .gall_writer .fr > span {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html.dcf-active .gallview_head .gall_count,
+html.dcf-active .gallview_head .gall_reply_num,
+html.dcf-active .gallview_head .gall_comment,
+html.dcf-active .gallview_head .gall_comment a {
+  color: var(--dcf-muted) !important;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+html.dcf-active .gallview_head .gall_comment a {
+  border: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+
+/* ── Body ───────────────────────────────────────────────────────────────── */
+
+html.dcf-active .writing_view_box .write_div {
+  color: var(--dcf-text) !important;
+  font-size: calc(14px * var(--dcf-font-scale)) !important;
+  line-height: 1.7 !important;
+  word-break: break-word;
+}
+
+html.dcf-active .writing_view_box > pre:empty {
+  display: none !important;
+}
+
+html.dcf-active .writing_view_box img,
+html.dcf-active .gallview_contents img {
+  max-width: 100%;
+  height: auto;
+}
+
+html.dcf-active .view_content_wrap a,
+html.dcf-active .comment_wrap a,
+html.dcf-active .write_div {
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .writing_view_box .write_div a {
+  color: var(--dcf-link) !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── Recommend box ──────────────────────────────────────────────────────── */
+
+html.dcf-active .btn_recommend_box,
+html.dcf-active .btn_recommend_box .inner,
+html.dcf-active .btn_recommend_box .inner_box,
+html.dcf-active .recommend_box,
+html.dcf-active .ad_bottom_list {
+  border-color: var(--dcf-border) !important;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .btn_recommend_box {
+  overflow: hidden;
+  border-radius: 4px !important;
+}
+
+html.dcf-active .btn_recommend_box button,
+html.dcf-active .btn_recommend_box span,
+html.dcf-active .btn_recommend_box em {
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .btn_recommend_box .up_num,
+html.dcf-active .btn_recommend_box .num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Bottom action bar (실베추 / 펌 / 공유 / 스크랩 / 신고). */
+html.dcf-active .btn_recommend_box .recom_bottom_box {
+  border-color: var(--dcf-border) !important;
+  border-radius: 0 !important;
+  background: var(--dcf-surface-2) !important;
+}
+
+html.dcf-active .btn_recommend_box .recom_bottom_box button {
+  border-color: transparent !important;
+  border-radius: 3px !important;
+  background: transparent !important;
+  color: var(--dcf-muted) !important;
+  font-weight: 500;
+}
+
+html.dcf-active .btn_recommend_box .recom_bottom_box button:hover {
+  background: var(--dcf-surface-3) !important;
+  color: var(--dcf-link) !important;
+}
+
+html.dcf-dark .btn_recommend_box .recom_bottom_box .sp_img {
+  filter: invert(0.82) hue-rotate(180deg);
+}
+
+/* ── Comments ───────────────────────────────────────────────────────────── */
+
+html.dcf-active .comment_wrap {
+  box-sizing: border-box;
+  margin-top: 12px !important;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 6px !important;
+  padding: 4px 14px 8px !important;
+  font-size: calc(13px * var(--dcf-font-scale)) !important;
+  box-shadow: none;
+}
+
+html.dcf-active .comment_wrap .comment_box {
+  border-top: 0 !important;
+}
+
+html.dcf-active .comment_wrap .comment_box + .comment_box {
+  border-top: 1px solid var(--dcf-border) !important;
+}
+
+html.dcf-active .comment_wrap .usertxt {
+  color: var(--dcf-text) !important;
+  line-height: 1.6 !important;
+}
+
+html.dcf-active .comment_wrap .contgo::before,
+html.dcf-active .comment_wrap .btn_cmt_close::before,
+html.dcf-active .comment_wrap .btn_cmt_refresh::before,
+html.dcf-active .comment_wrap .contgo::after,
+html.dcf-active .comment_wrap .btn_cmt_close::after,
+html.dcf-active .comment_wrap .btn_cmt_refresh::after {
+  content: none !important;
+}
+
+html.dcf-active .comment_wrap .btn_cmt_close,
+html.dcf-active .comment_wrap .btn_cmt_refresh {
+  margin-left: 14px !important;
+}
+
+html.dcf-active .comment_wrap .contgo,
+html.dcf-active .comment_wrap .btn_cmt_close,
+html.dcf-active .comment_wrap .btn_cmt_close span,
+html.dcf-active .comment_wrap .btn_cmt_refresh {
+  border-radius: 3px !important;
+  color: var(--dcf-muted) !important;
+  font-weight: 500;
+}
+
+html.dcf-active .comment_wrap .contgo:hover,
+html.dcf-active .comment_wrap .btn_cmt_close:hover,
+html.dcf-active .comment_wrap .btn_cmt_close:hover span,
+html.dcf-active .comment_wrap .btn_cmt_refresh:hover {
+  color: var(--dcf-link) !important;
+}
+
+html.dcf-active .comment_wrap .comment_count .num_box {
+  color: var(--dcf-text) !important;
+}
+
+/* The total is red on the site; the list prints the same count in the
+   accent, so the view follows the list. */
+html.dcf-active .comment_wrap .reply_num,
+html.dcf-active .comment_wrap .comment_count .font_red,
+html.dcf-active .comment_wrap .comment_count .font_red span {
+  color: var(--dcf-link) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sort switch (등록순 / 최신순 / 답글순): the site inks only the checked one,
+   in its fixed navy, which vanishes on dark. Muted options, accent choice. */
+html.dcf-active .comment_sort label {
+  color: var(--dcf-muted) !important;
+  font-weight: 500;
+}
+
+html.dcf-active .comment_sort input:checked ~ label {
+  color: var(--dcf-link) !important;
+  font-weight: 600;
+}
+
+/* ── Write box ──────────────────────────────────────────────────────────── */
+
+html.dcf-active .cmt_write_box {
+  box-sizing: border-box;
+  margin-top: 12px !important;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 6px !important;
+  padding: 12px 14px !important;
+  box-shadow: none;
+}
+
+html.dcf-active .user_info_input {
+  border-color: var(--dcf-border-strong) !important;
+  border-radius: 3px !important;
+  background: var(--dcf-input) !important;
+  overflow: hidden;
+}
+
+html.dcf-active .user_info_input input {
+  background: var(--dcf-input) !important;
+  color: var(--dcf-text) !important;
+  font-size: 12px;
+}
+
+html.dcf-active .cmt_write_box textarea,
+html.dcf-active .comment_wrap textarea {
+  border-color: var(--dcf-border-strong) !important;
+  border-radius: 3px !important;
+  padding: 10px 12px !important;
+  background: var(--dcf-input) !important;
+  color: var(--dcf-text) !important;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+html.dcf-active .cmt_write_box textarea:focus,
+html.dcf-active .user_info_input:focus-within {
+  border-color: var(--dcf-tone) !important;
+}
+
+html.dcf-active .cmt_write_box .btn_svc,
+html.dcf-active .cmt_write_box .btn_blue,
+html.dcf-active .cmt_write_box .btn_grey,
+html.dcf-active .view_bottom_btnbox button,
+html.dcf-active .view_bottom_btnbox a {
+  border-radius: 3px !important;
+  font-weight: 500;
+}
+
+html.dcf-active .cmt_write_box .btn_svc,
+html.dcf-active .cmt_write_box .btn_blue {
+  color: var(--dcf-on-accent) !important;
+  font-weight: 600;
+}
+
+/* 등록+추천 is the site's lighter navy — a second, slightly different blue
+   next to 등록. Make it the outline sibling of the primary instead. */
+html.dcf-active .cmt_write_box .btn_lightblue {
+  border: 1px solid color-mix(in oklab, var(--dcf-tone) 55%, var(--dcf-border-strong)) !important;
+  background: var(--dcf-surface) !important;
+  background-image: none !important;
+  color: var(--dcf-link) !important;
+}
+
+html.dcf-active .cmt_write_box .btn_lightblue:hover {
+  background: color-mix(in oklab, var(--dcf-tone) 8%, var(--dcf-surface)) !important;
+}
+
+/* 디시콘 opener: the site's white chip glows in dark. */
+html.dcf-active .cmt_write_box .btn_white {
+  border: 1px solid var(--dcf-border-strong) !important;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .view_bottom_btnbox button,
+html.dcf-active .view_bottom_btnbox a {
+  border: 1px solid var(--dcf-border-strong) !important;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+}
+
+/* Attachments and comment paging. */
+html.dcf-active .appending_file_box,
+html.dcf-active .appending_cap_box {
+  box-sizing: border-box;
+  margin-top: 10px !important;
+  border: 1px solid var(--dcf-border) !important;
+  border-radius: 4px !important;
+  padding: 10px 14px !important;
+  background: var(--dcf-surface-2) !important;
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .appending_file_box a,
+html.dcf-active .appending_file_box li,
+html.dcf-active .appending_cap_box a {
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-active .comment_wrap .bottom_paging_box {
+  border-color: var(--dcf-border) !important;
+}
+
+/* ── Dark-mode long tail for site defaults ────────────────────────────────
+   DCInside hardcodes #333 ink, #fff button fills and a stack of near-white
+   panels. syncDarkInk only rescues .writing_view_box / .write_div /
+   .comment_wrap .usertxt ink, so everything else has to be covered here or a
+   light box flashes in the middle of a dark page. */
+
+html.dcf-dark.dcf-dark.dcf-dark .writing_view_box .write_div {
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-dark.dcf-dark.dcf-dark .writing_view_box .write_div :where(p, div, span, li, td, th, font, b, strong, em, i, u, h1, h2, h3, h4, h5, h6, pre, code, blockquote, dl, dt, dd, small, sub, sup):not([style*="color"]) {
+  color: var(--dcf-text) !important;
+}
+
+/* Generalized form: everything except links and author-colored inline ink. */
+html.dcf-dark.dcf-dark.dcf-dark .writing_view_box .write_div :not(a, [style*="color" i], [style*="color" i] *) {
+  color: var(--dcf-text) !important;
+}
+
+html.dcf-dark.dcf-dark.dcf-dark .writing_view_box .write_div a:not([style*="color"]) {
+  color: var(--dcf-link) !important;
+}
+
+/* Inline light surfaces pasted into a post (tables, quote boxes). */
+html.dcf-dark .writing_view_box .write_div [style*="background"],
+html.dcf-dark .writing_view_box .write_div table,
+html.dcf-dark .writing_view_box .write_div th,
+html.dcf-dark .writing_view_box .write_div td {
+  border-color: var(--dcf-border) !important;
+}
+
+/* Link preview (OpenGraph) card inside the body. */
+html.dcf-dark .writing_view_box .write_div .og-wrap {
+  border-color: var(--dcf-border) !important;
+  background-color: var(--dcf-surface-2) !important;
+}
+
+html.dcf-dark .writing_view_box .write_div .og-wrap [class^="og-"],
+html.dcf-dark .writing_view_box .write_div .og-wrap [class*=" og-"] {
+  border-color: var(--dcf-border) !important;
+  background-color: transparent !important;
+}
+
+/* The JS hook: elements whose inline color syncDarkInk judged to be dark ink.
+   Kept so the hook has somewhere to land once it stamps [data-dcf-ink]. */
+html.dcf-dark.dcf-dark.dcf-dark .writing_view_box .write_div [data-dcf-ink] {
+  color: var(--dcf-text) !important;
+}
+
+/* Comment nicknames sitting on the site's #333. */
+html.dcf-dark.dcf-dark .comment_wrap .gall_writer .nickname,
+html.dcf-dark.dcf-dark .comment_wrap .gall_writer .nickname em,
+html.dcf-dark.dcf-dark .comment_wrap .nickname,
+html.dcf-dark.dcf-dark .comment_wrap .nickname em {
+  color: var(--dcf-text) !important;
+}
+
+/* My-comment highlight (.nickname.me) — the site fills it pale blue. */
+html.dcf-dark.dcf-dark .comment_wrap .nickname.me {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--dcf-tone) 22%, var(--dcf-surface)) !important;
+  color: var(--dcf-text) !important;
+}
+
+/* White button links at the top of the comment list. */
+html.dcf-dark.dcf-dark .comment_wrap .cmtup,
+html.dcf-dark.dcf-dark .comment_wrap .btn_cmt_refresh,
+html.dcf-dark.dcf-dark .comment_wrap .btn_cmt_close {
+  border-color: var(--dcf-border) !important;
+  background: var(--dcf-surface-2) !important;
+  color: var(--dcf-text) !important;
+}
+
+/* Comment dccon / emoticon frames. */
+html.dcf-dark .comment_wrap .comment_dccon,
+html.dcf-dark .comment_wrap .comment_dccon img {
+  background-color: transparent !important;
+}
+
+/* Reply / comment text areas and their info strip. */
+html.dcf-dark .cmt_write_box,
+html.dcf-dark .comment_wrap .reply_box,
+html.dcf-dark .comment_wrap .comment_box {
+  border-color: var(--dcf-border) !important;
+  background: var(--dcf-surface) !important;
+}
+
+/* Paging and misc site-default ink. */
+html.dcf-dark .bottom_paging_box,
+html.dcf-dark .bottom_paging_box a,
+html.dcf-dark .bottom_paging_box span,
+html.dcf-dark .bottom_paging_box strong,
+html.dcf-dark .gall_list thead th,
+html.dcf-dark .list_bottom_btnbox a,
+html.dcf-dark .list_bottom_btnbox button,
+html.dcf-dark .select_area,
+html.dcf-dark .select_area a,
+html.dcf-dark .page_head button,
+html.dcf-dark .gall_issuebox button {
+  color: var(--dcf-muted) !important;
+}
+
+html.dcf-dark .bottom_paging_box em {
+  color: var(--dcf-link) !important;
+}
+
+/* Anything on the page still painting a near-white background gets flipped to
+   a surface. Attribute matching catches the site's inline `background:#fff`
+   on list rows, quote boxes and popup panels. */
+html.dcf-dark .gall_list tbody tr:not([data-no]) td,
+html.dcf-dark .gall_list tbody tr:not(.us-post) td {
+  background: color-mix(in srgb, var(--dcf-surface-2) 60%, var(--dcf-surface)) !important;
+}
+
+html.dcf-dark .issue_wrap:has(#gall_top_recom),
+html.dcf-dark .concept_wrap,
+html.dcf-dark .right_content .content_box > header,
+html.dcf-dark .login_box .user_info,
+html.dcf-dark .login_box .user_option,
+html.dcf-dark .appending_file_box,
+html.dcf-dark .appending_cap_box,
+html.dcf-dark .btn_recommend_box .recom_bottom_box {
+  border-color: var(--dcf-border) !important;
+  background: var(--dcf-surface-2) !important;
+  color: var(--dcf-text) !important;
+}
+
+/* ==========================================================================
+   07. VISIBILITY TOGGLES
+   ========================================================================== */
+
+html.dcf-hide-timebest .r_timebest,
+html.dcf-hide-timebest .right_content article:has(.r_timebest),
+html.dcf-hide-dcmedia .r_dcmedia,
+html.dcf-hide-dcmedia .right_content article:has(.r_dcmedia),
+html.dcf-hide-concept .r_recommend,
+html.dcf-hide-concept .right_content article:has(.r_recommend),
+html.dcf-hide-concept #gall_top_recom,
+html.dcf-hide-concept .issue_wrap:has(#gall_top_recom) {
+  display: none !important;
+}
+
+html.dcf-hide-gnb-promo .gall_exposure {
+  display: none !important;
+}
+
+/* New-gallery / stats / roulette slots move out of the GNB's right edge and
+   become their own information strip under the menu: the dark bar grows to
+   two rows instead of being forced to a fixed 44px. */
+html.dcf-active:not(.dcf-hide-gnb-promo) .gnb_bar,
+html.dcf-active:not(.dcf-hide-gnb-promo) .gnb_bar .gnb {
+  height: auto !important;
+}
+
+html.dcf-active:not(.dcf-hide-gnb-promo) .gall_exposure {
+  position: static !important;
+  float: none !important;
+  clear: both;
+  box-sizing: border-box;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  width: 100% !important;
+  height: 34px !important;
+  margin: 0 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 0 8px !important;
+  background: transparent !important;
+}
+
+html.dcf-active:not(.dcf-hide-gnb-promo) .gall_exposure > div {
+  display: inline-flex !important;
+  align-items: center;
+  float: none !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+  font-size: 12px;
+  line-height: 1 !important;
+}
+
+html.dcf-active:not(.dcf-hide-gnb-promo) .gall_exposure > div a {
+  display: inline-flex;
+  align-items: center;
+  height: auto !important;
+  margin: 0 !important;
+  border: 0;
+  border-radius: 0;
+  padding: 0 !important;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82) !important;
+  line-height: 1 !important;
+}
+
+html.dcf-active:not(.dcf-hide-gnb-promo) .gall_exposure .num {
+  margin: 0 4px;
+  color: var(--dcf-nav-highlight) !important;
+  font-weight: 600;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+html.dcf-active:not(.dcf-hide-gnb-promo) .gall_exposure .ltr a {
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 3px;
+  padding: 4px 11px !important;
+  color: #ffffff !important;
+}
+
+html.dcf-active:not(.dcf-hide-gnb-promo) .gall_exposure .ltr a:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Empty rail: keep the login panel where it is and strip the rest. */
+html.dcf-clean-rail #container.listwrap .right_content > article,
+html.dcf-clean-rail #container.listwrap .right_content > div:not(:has(#login_box)) {
+  display: none !important;
+}
+
+html.dcf-clean-rail #container.listwrap .right_content div:has(> #login_box) > :not(#login_box) {
+  display: none !important;
+}
+
+html.dcf-hide-images .write_div img,
+html.dcf-hide-images .view_content img,
+html.dcf-hide-images .appending_cap_box img,
+html.dcf-hide-images .gall_content img,
+html.dcf-hide-images .comment_dccon img,
+html.dcf-hide-images .dcf-image-block-button {
+  display: none !important;
+}
+
+/* The site marks auto-자짤 itself; hide those immediately, before any
+   fingerprinting. Real attachments carry data-fileno and are excluded. */
+html.dcf-hide-auto-zzal #zzbang_div,
+html.dcf-hide-auto-zzal .write_div #auto_zzal_img,
+html.dcf-hide-auto-zzal .write_div img[data-azno]:not([data-fileno]),
+html.dcf-hide-auto-zzal .write_div img[src*="/viewimage.php"][src*="no=29bcc427"]:not([data-fileno]) {
+  display: none !important;
+}
+
+/* Ad tokens are matched at the START of the token only — a loose `ad-`
+   substring test would swallow .dcf-read-row. */
+html.dcf-hide-ads [id="ad"],
+html.dcf-hide-ads [id^="ad_"],
+html.dcf-hide-ads [id^="ad-"],
+html.dcf-hide-ads [class~="ad"],
+html.dcf-hide-ads [class^="ad_"],
+html.dcf-hide-ads [class*=" ad_"],
+html.dcf-hide-ads [class^="ad-"],
+html.dcf-hide-ads [class*=" ad-"],
+html.dcf-hide-ads .rightbanner1,
+html.dcf-hide-ads .leftbanner,
+html.dcf-hide-ads .bottom_ad,
+html.dcf-hide-ads .ad_area {
+  display: none !important;
+}
+
+/* ==========================================================================
+   08. EXTENSION UI
+   ========================================================================== */
+
+/* ── Ratio / ID / IP tags ───────────────────────────────────────────────── */
+
+.dcf-ratio-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  border: 1px solid color-mix(in srgb, var(--dcf-tone) 26%, var(--dcf-border));
+  border-radius: 3px;
+  padding: 1px 5px;
+  background: color-mix(in srgb, var(--dcf-tone) 10%, var(--dcf-surface));
+  color: var(--dcf-link);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  vertical-align: middle;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dcf-ratio-badge:hover {
+  border-color: color-mix(in srgb, var(--dcf-tone) 44%, var(--dcf-border));
+  background: color-mix(in srgb, var(--dcf-tone) 16%, var(--dcf-surface));
+}
+
+.dcf-id-badge,
+.dcf-ip-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.dcf-id-badge {
+  border-color: var(--dcf-border);
+  background: var(--dcf-surface-2);
+  color: var(--dcf-muted) !important;
+}
+
+/* IP tags keep square-cornered 2px: they are data labels, not chips. */
+.dcf-ip-badge {
+  border-radius: 2px;
+}
+
+.dcf-ip-domestic {
+  border-color: var(--dcf-ip-domestic-line) !important;
+  background: var(--dcf-ip-domestic-bg);
+  color: var(--dcf-ip-domestic-ink) !important;
+}
+
+.dcf-ip-mobile {
+  border-color: var(--dcf-ip-mobile-line) !important;
+  background: var(--dcf-ip-mobile-bg);
+  color: var(--dcf-ip-mobile-ink) !important;
+}
+
+.dcf-ip-overseas {
+  border-color: var(--dcf-ip-overseas-line) !important;
+  background: var(--dcf-ip-overseas-bg);
+  color: var(--dcf-ip-overseas-ink) !important;
+}
+
+.dcf-ip-unknown {
+  border-color: var(--dcf-border) !important;
+  background: var(--dcf-surface-2);
+  color: var(--dcf-muted) !important;
+}
+
+/* ── Author trigger ───────────────────────────────────────────────────────
+   Hidden until the row is hovered or contains focus. It is absolutely
+   positioned inside td.gall_writer, so the behaviour is opacity + pointer
+   events only — no layout shift on hover. */
+
+.dcf-author-trigger {
+  border: 1px solid var(--dcf-border-strong);
+  border-radius: 3px;
+  padding: 1px 6px;
+  background: var(--dcf-surface);
+  color: var(--dcf-link);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+html.dcf-active td.gall_writer {
+  position: relative;
+}
+
+html.dcf-active td.gall_writer .dcf-author-trigger {
+  position: absolute;
+  inset-inline-end: 2px;
+  top: 50%;
+  z-index: 2;
+  width: 34px;
+  min-height: 20px;
+  margin-left: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+html.dcf-active td.gall_writer:hover .dcf-author-trigger,
+html.dcf-active td.gall_writer:focus-within .dcf-author-trigger {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+html.dcf-active td.gall_writer .dcf-author-trigger:hover {
+  border-color: color-mix(in srgb, var(--dcf-tone) 45%, var(--dcf-border-strong));
+  background: color-mix(in srgb, var(--dcf-tone) 8%, var(--dcf-surface));
+}
+
+/* ── Floating author button ─────────────────────────────────────────────── */
+
+.dcf-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2147483646;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--dcf-tone) 40%, var(--dcf-border-strong));
+  border-radius: 3px;
+  padding: 8px 13px;
+  background: var(--dcf-surface);
+  color: var(--dcf-text) !important;
+  box-shadow: var(--dcf-shadow);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.dcf-fab:hover {
+  border-color: var(--dcf-tone);
+  background: color-mix(in srgb, var(--dcf-tone) 8%, var(--dcf-surface));
+}
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+
+.dcf-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 2147483646;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  transform: translateX(-50%);
+  border: 1px solid var(--dcf-border-strong);
+  border-radius: 3px;
+  padding: 8px 10px 8px 12px;
+  background: var(--dcf-surface);
+  color: var(--dcf-text);
+  box-shadow: var(--dcf-shadow);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.dcf-toast button {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--dcf-surface-2);
+  color: var(--dcf-muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dcf-toast button:hover {
+  background: var(--dcf-surface-3);
+  color: var(--dcf-text);
+}
+
+.dcf-toast-error {
+  border-color: color-mix(in srgb, var(--dcf-danger) 52%, var(--dcf-border-strong));
+  color: var(--dcf-link);
+}
+
+/* ── Image preview ──────────────────────────────────────────────────────── */
+
+.dcf-image-preview {
+  position: fixed;
+  z-index: 2147483646;
+  width: min(460px, calc(100vw - 28px));
+  max-height: calc(100vh - 28px);
+  overflow: hidden;
+  pointer-events: none;
+  border: 1px solid var(--dcf-border-strong);
+  border-radius: 4px;
+  padding: 10px;
+  background: var(--dcf-surface);
+  color: var(--dcf-text);
+  box-shadow: var(--dcf-shadow);
+}
+
+.dcf-preview-title {
+  overflow: hidden;
+  max-height: 3em;
+  margin: 0 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.dcf-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  max-height: min(430px, calc(100vh - 130px));
+  overflow: hidden;
+  border: 1px solid var(--dcf-border);
+  border-radius: 3px;
+  background: var(--dcf-media-bg);
+}
+
+.dcf-preview-grid.dcf-preview-count-1 {
+  display: block;
+}
+
+.dcf-preview-grid img {
+  display: block;
+  width: 100%;
+  height: min(200px, calc((100vh - 140px) / 2));
+  object-fit: contain;
+  background: var(--dcf-media-bg);
+}
+
+.dcf-preview-grid.dcf-preview-count-1 img {
+  height: auto;
+  max-height: min(410px, calc(100vh - 130px));
+}
+
+.dcf-preview-meta {
+  margin: 7px 2px 0;
+  color: var(--dcf-muted);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.dcf-preview-skeleton {
+  display: grid;
+  height: 160px;
+  place-items: center;
+  border-radius: 3px;
+  background: linear-gradient(100deg, var(--dcf-surface-2) 20%, var(--dcf-surface-3) 40%, var(--dcf-surface-2) 60%);
+  background-size: 220% 100%;
+  color: var(--dcf-muted);
+  font-size: 12px;
+  animation: dcf-skeleton 1.4s linear infinite;
+}
+
+@keyframes dcf-skeleton {
+  to { background-position-x: -220%; }
+}
+
+/* ── Author panel ───────────────────────────────────────────────────────── */
+
+.dcf-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: 24px;
+  background: var(--dcf-scrim);
+  animation: dcf-overlay-in 140ms ease-out both;
+}
+
+.dcf-overlay:not([open]) { display: none; }
+.dcf-overlay::backdrop { background: transparent; }
+
+@keyframes dcf-overlay-in {
+  from { opacity: 0; }
+}
+
+.dcf-panel {
+  width: min(var(--dcf-panel-width, 720px), calc(100vw - 32px));
+  max-height: min(84vh, 900px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dcf-border-strong);
+  border-radius: 6px;
+  background: var(--dcf-surface);
+  color: var(--dcf-text);
+  box-shadow: var(--dcf-shadow);
+  animation: dcf-panel-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes dcf-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.dcf-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--dcf-border);
+  background: var(--dcf-surface-2);
+}
+
+.dcf-panel-header > div { min-width: 0; }
+
+.dcf-panel-title {
+  margin: 0;
+  color: var(--dcf-text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.dcf-panel-subtitle {
+  margin: 5px 0 0;
+  color: var(--dcf-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.dcf-close {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--dcf-border-strong);
+  border-radius: 3px;
+  background: var(--dcf-surface);
+  color: var(--dcf-text);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+
+.dcf-close:hover {
+  border-color: color-mix(in srgb, var(--dcf-tone) 48%, var(--dcf-border-strong));
+  background: color-mix(in srgb, var(--dcf-tone) 10%, var(--dcf-surface));
+  color: var(--dcf-link);
+}
+
+.dcf-panel-body {
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 16px 20px 20px;
+}
+
+.dcf-loading,
+.dcf-error {
+  padding: 28px 12px;
+  color: var(--dcf-muted);
+  text-align: center;
+}
+
+.dcf-error {
+  color: var(--dcf-text);
+}
+
+.dcf-error p {
+  margin: 8px 0 0;
+  color: var(--dcf-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.dcf-retry {
+  margin-top: 14px;
+  border: 1px solid var(--dcf-border-strong);
+  border-radius: 3px;
+  padding: 7px 14px;
+  background: var(--dcf-surface-2);
+  color: var(--dcf-link);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dcf-retry:hover {
+  border-color: color-mix(in srgb, var(--dcf-tone) 45%, var(--dcf-border-strong));
+  background: color-mix(in srgb, var(--dcf-tone) 8%, var(--dcf-surface-2));
+}
+
+/* Stats strip inside the panel: one hairline box, shared dividers. */
+.dcf-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: 14px;
+  overflow: hidden;
+  border: 1px solid var(--dcf-border);
+  border-radius: 4px;
+  background: var(--dcf-surface-2);
+}
+
+.dcf-stat {
+  min-width: 0;
+  padding: 10px 12px;
+  background: transparent;
+}
+
+.dcf-stat + .dcf-stat {
+  border-left: 1px solid var(--dcf-border);
+}
+
+.dcf-stat-label {
+  display: block;
+  color: var(--dcf-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.dcf-stat-value {
+  display: block;
+  margin-top: 4px;
+  color: var(--dcf-text);
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  word-break: keep-all;
+}
+
+.dcf-summary {
+  margin: 0 0 14px;
+  border: 1px solid var(--dcf-border);
+  border-left: 2px solid var(--dcf-tone);
+  border-radius: 3px;
+  padding: 10px 13px;
+  background: color-mix(in srgb, var(--dcf-tone) 5%, var(--dcf-surface));
+  color: var(--dcf-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.dcf-table-hint {
+  display: none;
+  margin: 0 0 8px;
+  color: var(--dcf-muted);
+  font-size: 12px;
+}
+
+.dcf-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--dcf-border);
+  border-radius: 4px;
+  background: var(--dcf-surface);
+}
+
+.dcf-table-wrap:focus-visible {
+  outline: 2px solid var(--dcf-link);
+  outline-offset: 2px;
+}
+
+.dcf-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dcf-table th,
+.dcf-table td {
+  border-bottom: 1px solid var(--dcf-border);
+  padding: 8px 12px;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-text) !important;
+  text-align: left;
+  vertical-align: top;
+}
+
+.dcf-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid var(--dcf-border-strong);
+  background: var(--dcf-surface-2) !important;
+  color: var(--dcf-muted) !important;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dcf-table th:first-child,
+.dcf-table td:first-child { width: 42px; }
+
+.dcf-table th:nth-child(3),
+.dcf-table td:nth-child(3),
+.dcf-table th:nth-child(4),
+.dcf-table td:nth-child(4),
+.dcf-table th:nth-child(5),
+.dcf-table td:nth-child(5) {
+  width: 72px;
+  text-align: right;
+}
+
+.dcf-table th:nth-child(6),
+.dcf-table td:nth-child(6) {
+  width: 78px;
+  text-align: right;
+}
+
+.dcf-table tbody tr:hover td {
+  background: var(--dcf-surface-2) !important;
+}
+
+.dcf-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.dcf-post-link {
+  display: inline-block;
+  max-width: 100%;
+  color: var(--dcf-text) !important;
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.dcf-post-link:hover {
+  color: var(--dcf-link) !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dcf-num {
+  color: var(--dcf-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dcf-muted {
+  color: var(--dcf-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* ── Signature-image blocker ────────────────────────────────────────────── */
+
+.dcf-image-block-button {
+  position: absolute !important;
+  top: 8px !important;
+  right: auto !important;
+  left: 8px !important;
+  z-index: 30;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.24) !important;
+  border-radius: 3px;
+  padding: 0 9px !important;
+  background: rgba(14, 16, 22, 0.86) !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  line-height: 24px !important;
+  opacity: 0;
+  transform: translateY(-3px);
+  cursor: pointer;
+  transition: opacity 120ms ease, transform 120ms ease, background-color 120ms ease;
+}
+
+html.dcf-active .imgwrap:hover > .dcf-image-block-button,
+.dcf-image-block-button:focus-visible,
+.dcf-image-block-button.is-busy {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.dcf-image-block-button:hover:not(:disabled) {
+  background: rgba(185, 58, 48, 0.94) !important;
+}
+
+.dcf-image-block-button:disabled {
+  cursor: progress;
+}
+
+.dcf-image-fingerprint-blocked > .imgwrap {
+  display: none !important;
+}
+
+.dcf-image-blocked-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  width: min(640px, 100%);
+  min-height: 46px;
+  border: 1px solid var(--dcf-border);
+  border-left: 2px solid var(--dcf-tone);
+  border-radius: 3px;
+  padding: 8px 10px 8px 12px;
+  background: var(--dcf-surface-2);
+  color: var(--dcf-text);
+  animation: dcf-image-collapse-in 130ms ease-out both;
+}
+
+.dcf-image-blocked-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dcf-image-blocked-copy strong {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.dcf-image-blocked-copy small {
+  color: var(--dcf-muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.dcf-image-blocked-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.dcf-image-blocked-actions button {
+  height: 26px;
+  border: 1px solid var(--dcf-border-strong) !important;
+  border-radius: 3px;
+  padding: 0 9px !important;
+  background: var(--dcf-surface) !important;
+  color: var(--dcf-muted) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+
+.dcf-image-blocked-actions button:hover,
+.dcf-image-blocked-actions button:focus-visible {
+  border-color: color-mix(in srgb, var(--dcf-tone) 48%, var(--dcf-border-strong)) !important;
+  background: color-mix(in srgb, var(--dcf-tone) 8%, var(--dcf-surface)) !important;
+  color: var(--dcf-link) !important;
+  outline: 0;
+}
+
+@keyframes dcf-image-collapse-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+/* ==========================================================================
+   09. FOCUS, MOTION, RESPONSIVE, FORCED COLORS
+   ========================================================================== */
+
+/* Every interactive element we restyle keeps a visible focus ring. */
+html.dcf-active :is(
+  .dcf-author-trigger, .dcf-fab, .dcf-close, .dcf-retry, .dcf-ratio-badge,
+  .dcf-image-block-button, .dcf-table-wrap, .dcf-post-link, .dcf-toast button,
+  .dcf-image-blocked-actions button, [data-dcf-toast-close]
+):focus-visible {
+  outline: 2px solid var(--dcf-link);
+  outline-offset: 2px;
+}
+
+html.dcf-active :is(input, select, textarea, button, a[href]):focus-visible {
+  outline: 2px solid var(--dcf-link);
+  outline-offset: 1px;
+}
+
+/* The site sets outline:0 on a lot of chrome; give it back on the pieces we
+   actually restyle. */
+html.dcf-active .list_array_option button:focus-visible,
+html.dcf-active .page_head button:focus-visible,
+html.dcf-active .bottom_paging_box a:focus-visible,
+html.dcf-active .cmt_write_box button:focus-visible,
+html.dcf-active .view_bottom_btnbox a:focus-visible,
+html.dcf-active #visit_history button:focus-visible,
+html.dcf-active #visit_history_lyr button:focus-visible {
+  outline: 2px solid var(--dcf-link) !important;
+  outline-offset: 2px;
+}
+
+/* Theme swap: kill transitions so the flip does not smear. */
+html.dcf-theme-changing *,
+html.dcf-theme-changing *::before,
+html.dcf-theme-changing *::after {
+  transition: none !important;
+}
+
+/* Auto-refresh in flight: subtle, non-layout-shifting. */
+html.dcf-refreshing .gall_listwrap {
+  border-color: color-mix(in srgb, var(--dcf-tone) 35%, var(--dcf-border)) !important;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  /* The toolbar's three tracks do not fit; drop the subject column, which
+     stays reachable from the site's own filters. */
+  html.dcf-active .list_array_option {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
+  html.dcf-active .list_array_option .center_box {
+    display: none !important;
+  }
+
+  html.dcf-active .list_array_option .right_box {
+    justify-self: end;
+  }
+
+  .dcf-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dcf-stat:nth-child(3) {
+    border-top: 1px solid var(--dcf-border);
+    border-left: 0;
+  }
+
+  .dcf-stat:nth-child(4) {
+    border-top: 1px solid var(--dcf-border);
+  }
+
+  .dcf-panel-header,
+  .dcf-panel-body {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .dcf-table-hint {
+    display: block;
+  }
+}
+
+@media (max-width: 560px) {
+  /* Column budget at phone widths: number and recommend go first, views next.
+     Author and date stay, because the read state and recency are the point. */
+  html.dcf-active .gall_list thead th:first-child,
+  html.dcf-active .gall_list tbody td.gall_num,
+  html.dcf-active .gall_list colgroup > col:first-child,
+  html.dcf-active .gall_list tbody td.gall_recommend,
+  html.dcf-active .gall_list colgroup > col:nth-last-child(1) {
+    display: none !important;
+  }
+
+  html.dcf-active .gall_list td.gall_writer.ub-writer {
+    max-width: 96px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dcf-overlay {
+    padding: 8px;
+  }
+
+  .dcf-panel {
+    width: 100%;
+    max-height: 95vh;
+    border-radius: 3px;
+  }
+
+  .dcf-image-blocked-placeholder {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  html.dcf-active *,
+  html.dcf-active *::before,
+  html.dcf-active *::after,
+  [data-dcf-owned],
+  [data-dcf-owned] *,
+  .dcf-overlay,
+  .dcf-panel,
+  .dcf-toast,
+  .dcf-image-preview,
+  .dcf-preview-skeleton,
+  .dcf-image-blocked-placeholder {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* The two row moments are tint-only; under reduced motion keep the end
+     state (a rail for return, flat for new) instead of the fade. */
+  html.dcf-active .ub-content.dcf-new-row > td {
+    animation: none !important;
+    background-color: var(--dcf-surface) !important;
+  }
+
+  html.dcf-active .ub-content.dcf-return-row > td {
+    animation: none !important;
+  }
+
+  html.dcf-active .ub-content.dcf-return-row > td:first-child {
+    box-shadow: inset 2px 0 0 var(--dcf-tone) !important;
+  }
+
+  html.dcf-active .ub-content.dcf-selected-row > td:first-child {
+    box-shadow: inset 2px 0 0 var(--dcf-tone) !important;
+  }
+}
+
+/* ── Forced colors ──────────────────────────────────────────────────────── */
+
+@media (forced-colors: active) {
+  html.dcf-active [data-dcf-owned]:focus-visible,
+  .dcf-author-trigger:focus-visible,
+  .dcf-fab:focus-visible,
+  .dcf-close:focus-visible,
+  .dcf-ratio-badge:focus-visible,
+  .dcf-image-block-button:focus-visible,
+  .dcf-image-blocked-actions button:focus-visible,
+  .dcf-table-wrap:focus-visible {
+    outline: 2px solid Highlight;
+  }
+
+  /* Borders carry the meaning once fills are system-forced. */
+  html.dcf-active .gall_listwrap,
+  html.dcf-active .view_content_wrap,
+  html.dcf-active .comment_wrap,
+  html.dcf-active .cmt_write_box,
+  html.dcf-active .list_array_option,
+  .dcf-panel,
+  .dcf-image-preview,
+  .dcf-toast,
+  .dcf-ratio-badge,
+  .dcf-id-badge,
+  .dcf-ip-badge,
+  .dcf-comment-delta {
+    border-color: CanvasText !important;
+  }
+
+  /* Row states cannot rely on a color mix here; use borders instead. */
+  html.dcf-active .ub-content.dcf-selected-row > td:first-child,
+  html.dcf-active .ub-content.dcf-return-row > td:first-child {
+    box-shadow: inset 2px 0 0 Highlight !important;
+  }
+
+  html.dcf-active .ub-content.dcf-read-row > td,
+  html.dcf-active .gall_list .dcf-read-row td.gall_tit > a:first-of-type,
+  html.dcf-active .gall_list .gall_tit a.dcf-read-link:not(:hover) {
+    color: GrayText !important;
+  }
+
+  html.dcf-active .dcf-native-blocked > td {
+    opacity: 1;
+    color: GrayText !important;
+  }
+}

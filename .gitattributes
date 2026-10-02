@@ -1,0 +1,5 @@
+# Keep packaged assets byte-identical on every operating system.
+* -text
+*.png binary
+*.onnx binary
+*.wasm binary
