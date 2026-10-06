@@ -2848,6 +2848,7 @@ html.dcf-hide-ads [class^="ad-"],
 html.dcf-hide-ads [class*=" ad-"],
 html.dcf-hide-ads .rightbanner1,
 html.dcf-hide-ads .leftbanner,
+html.dcf-hide-ads .banner_box,
 html.dcf-hide-ads .bottom_ad,
 html.dcf-hide-ads .ad_area {
   display: none !important;
